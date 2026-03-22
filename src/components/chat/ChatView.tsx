@@ -5,7 +5,6 @@ import { useSettingsStore } from '@/stores/settings-store'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { SuggestionChips } from './SuggestionChips'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { BookOpen } from 'lucide-react'
 import { sendChatMessage } from '@/lib/ai-service'
 
@@ -24,9 +23,14 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      // Timeout biztosítja, hogy a DOM frissült
+      setTimeout(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+        }
+      }, 50)
     }
-  }, [messages])
+  }, [messages, sending])
 
   const handleSend = async (content: string) => {
     if (!currentSession || sending) return
@@ -82,7 +86,7 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
 
   return (
     <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto p-4" ref={scrollRef}>
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center py-20">
             <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
@@ -115,7 +119,7 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
       {topicHints && suggestionsRef.current.length > 0 && !sending && (
         <SuggestionChips suggestions={suggestionsRef.current} onSelect={handleSuggestionClick} />
       )}
