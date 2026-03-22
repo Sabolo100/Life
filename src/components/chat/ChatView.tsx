@@ -54,10 +54,8 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
       await addMessage(response.message, false)
 
       if (response.lifeStoryUpdate) {
-        const newContent = lifeStory?.content
-          ? lifeStory.content + '\n\n' + response.lifeStoryUpdate
-          : response.lifeStoryUpdate
-        await updateLifeStory(newContent)
+        // Az AI a TELJES frissített életutat adja vissza (nem csak a deltát)
+        await updateLifeStory(response.lifeStoryUpdate)
       }
 
       if (response.extractedEntities) {

@@ -75,7 +75,7 @@ ${openQuestionsText}
 A válaszod KIZÁRÓLAG az alábbi JSON formátumban add vissza, semmi mást ne írj:
 {
   "message": "A válaszod és kérdésed a felhasználónak (természetes, beszélgetős stílus)",
-  "lifeStoryUpdate": "Új információ az életúthoz (csak ha a felhasználó tényeket mondott, az AI kérdéseit NE rögzítsd). null ha nincs új info.",
+  "lifeStoryUpdate": "A TELJES, FRISSÍTETT életút összefoglaló szövege. Ez TARTALMAZZA az összes korábbi tényt + az újonnan megtudottakat, egységes, tömör formában. Ha a felhasználó pontosított egy korábbi adatot, a régi verziót CSERÉLD KI az újra. null ha nincs új info.",
   "extractedEntities": {
     "persons": [{"name": "...", "relationship_type": "...", "related_period": "...", "notes": "..."}],
     "events": [{"title": "...", "description": "...", "time_type": "exact_date|estimated_year|life_phase|uncertain", "exact_date": "...", "estimated_year": null, "life_phase": "...", "uncertain_time": "...", "category": "...", "is_turning_point": false}],
@@ -92,10 +92,11 @@ FONTOS:
 - Ha nincs új entitás, az extractedEntities legyen null
 - A suggestions 3 rövid, változatos témájú folytatási javaslat legyen (max 8 szó)
 - Az openQuestions-ben frissítsd a nyitott kérdések listáját (új kérdések, lezárt kérdések)
-- A lifeStoryUpdate legyen tömör, tényszerű összefoglalás (nem a beszélgetés másolata)
-- HELYSZÍNEK: Egy helyszín CSAK EGYSZER szerepelhet a locations listában, ne add hozzá többször különböző típusokkal (pl. Parádfürdő csak egyszer, nem külön "kórház", "lakóhely", "gyerekkor helyszíne" stb.)
+- A lifeStoryUpdate a TELJES életút szövegét tartalmazza, nem csak az újat! Vedd az eddigi szöveget, és FRISSÍTSD/EGÉSZÍTSD KI az új tényekkel. Ha egy adat pontosodott (pl. dátum, helyszín), CSERÉLD KI a régit az újra — ne hagyd benne mindkettőt!
+- HELYSZÍNEK: Egy helyszín CSAK EGYSZER szerepelhet a locations listában, ne add hozzá többször különböző típusokkal
 - SZEMÉLYEK: Egy személy CSAK EGYSZER szerepelhet a persons listában, még ha több szerepe is volt
-- CSAK VALÓBAN ÚJ entitásokat adj hozzá - ha egy helyszín/személy már valószínűleg szerepel az életútban, ne add újra`
+- ESEMÉNYEK FRISSÍTÉSE: Ha a felhasználó pontosít egy korábbi eseményt (pl. megadja a dátumot), NE hozz létre új eseményt — használd PONTOSAN UGYANAZT a title-t mint az eredeti, és add meg a frissített mezőket (pl. time_type, exact_date, estimated_year). Az upsert a title alapján frissít!
+- CSAK VALÓBAN ÚJ entitásokat adj hozzá - ha egy helyszín/személy/esemény már szerepel, csak frissítés esetén add újra (ugyanazzal a névvel/title-lel)`
 }
 
 function isClaudeModel(model: string): boolean {
