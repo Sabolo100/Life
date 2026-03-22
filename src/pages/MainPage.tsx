@@ -1,24 +1,34 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Header } from '@/components/layout/Header'
 import { ChatView } from '@/components/chat/ChatView'
 import { SessionSidebar } from '@/components/chat/SessionSidebar'
 import { LifeStoryView } from '@/components/views/LifeStoryView'
+import { TimelineView } from '@/components/views/TimelineView'
 import { SettingsView } from '@/components/views/SettingsView'
+import { OpenQuestionsPanel } from '@/components/views/OpenQuestionsPanel'
 import { useChatStore } from '@/stores/chat-store'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { HelpCircle } from 'lucide-react'
 
-type View = 'chat' | 'lifeStory' | 'settings'
+type View = 'chat' | 'lifeStory' | 'timeline' | 'settings'
 
 export function MainPage() {
   const [currentView, setCurrentView] = useState<View>('chat')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [questionsPanelOpen, setQuestionsPanelOpen] = useState(false)
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null)
   const [aiStatus] = useState<'ok' | 'unknown' | 'error'>('unknown')
   const [storageStatus] = useState<'ok' | 'error'>('ok')
   const sessionInitialized = useRef(false)
 
   const { loadSessions, sessions, loading, createSession, currentSession } = useChatStore()
-  const { loadAll } = useLifeStoryStore()
+  const { loadAll, openQuestions } = useLifeStoryStore()
+
+  const openCount = openQuestions.filter(q => q.status === 'open').length
 
   useEffect(() => {
     loadSessions()
@@ -39,11 +49,22 @@ export function MainPage() {
     }
   }, [sessions, currentSession, createSession, loading])
 
+  const handleQuestionClick = useCallback((question: string) => {
+    setPendingQuestion(question)
+    // Switch to chat view if not already there
+    setCurrentView('chat')
+  }, [])
+
+  const handlePendingConsumed = useCallback(() => {
+    setPendingQuestion(null)
+  }, [])
+
   return (
     <div className="h-screen flex flex-col">
       <Header
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         onShowLifeStory={() => setCurrentView(currentView === 'lifeStory' ? 'chat' : 'lifeStory')}
+        onShowTimeline={() => setCurrentView(currentView === 'timeline' ? 'chat' : 'timeline')}
         onShowSettings={() => setCurrentView(currentView === 'settings' ? 'chat' : 'settings')}
         aiStatus={aiStatus}
         storageStatus={storageStatus}
@@ -60,17 +81,54 @@ export function MainPage() {
           </SheetContent>
         </Sheet>
         {/* Main content */}
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-hidden relative">
           {currentView === 'chat' && (
-            <ChatView onShowLifeStory={() => setCurrentView('lifeStory')} />
+            <ChatView
+              onShowLifeStory={() => setCurrentView('lifeStory')}
+              pendingQuestion={pendingQuestion}
+              onPendingConsumed={handlePendingConsumed}
+            />
           )}
           {currentView === 'lifeStory' && (
             <LifeStoryView onBack={() => setCurrentView('chat')} />
           )}
+          {currentView === 'timeline' && (
+            <TimelineView onBack={() => setCurrentView('chat')} />
+          )}
           {currentView === 'settings' && (
             <SettingsView onBack={() => setCurrentView('chat')} />
           )}
+          {/* Open Questions toggle button */}
+          {!questionsPanelOpen && (
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="absolute top-3 right-3 z-10"
+                  onClick={() => setQuestionsPanelOpen(true)}
+                >
+                  <HelpCircle className="w-4 h-4" />
+                  {openCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-2 -right-2 h-4 min-w-4 px-1 text-[10px] flex items-center justify-center"
+                    >
+                      {openCount}
+                    </Badge>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">Nyitott kerdesek</TooltipContent>
+            </Tooltip>
+          )}
         </main>
+        {/* Open Questions Panel */}
+        <OpenQuestionsPanel
+          open={questionsPanelOpen}
+          onClose={() => setQuestionsPanelOpen(false)}
+          onQuestionClick={handleQuestionClick}
+        />
       </div>
     </div>
   )

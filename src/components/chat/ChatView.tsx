@@ -11,9 +11,11 @@ import { sendChatMessage } from '@/lib/ai-service'
 
 interface ChatViewProps {
   onShowLifeStory: () => void
+  pendingQuestion?: string | null
+  onPendingConsumed?: () => void
 }
 
-export function ChatView({ onShowLifeStory: _onShowLifeStory }: ChatViewProps) {
+export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, onPendingConsumed }: ChatViewProps) {
   const { messages, currentSession, sending, addMessage, setSending } = useChatStore()
   const { lifeStory, openQuestions, updateLifeStory, upsertEntities, updateOpenQuestions } = useLifeStoryStore()
   const { topicHints, aiModel, emotionalLayer } = useSettingsStore()
@@ -119,7 +121,7 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory }: ChatViewProps) {
       {topicHints && suggestionsRef.current.length > 0 && !sending && (
         <SuggestionChips suggestions={suggestionsRef.current} onSelect={handleSuggestionClick} />
       )}
-      <ChatInput onSend={handleSend} disabled={sending} />
+      <ChatInput onSend={handleSend} disabled={sending} pendingMessage={pendingQuestion} onPendingConsumed={onPendingConsumed} />
     </div>
   )
 }

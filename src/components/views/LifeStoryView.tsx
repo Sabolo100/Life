@@ -1,18 +1,19 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Edit3, Save, X, Users, MapPin, Calendar } from 'lucide-react'
+import { ArrowLeft, Edit3, Save, X, Users, MapPin, Calendar, Heart } from 'lucide-react'
+import { EmotionBadge } from './EmotionBadge'
 
 interface LifeStoryViewProps {
   onBack: () => void
 }
 
 export function LifeStoryView({ onBack }: LifeStoryViewProps) {
-  const { lifeStory, persons, events, locations, updateLifeStory } = useLifeStoryStore()
+  const { lifeStory, persons, events, locations, emotions, updateLifeStory } = useLifeStoryStore()
   const [editing, setEditing] = useState(false)
   const [editContent, setEditContent] = useState('')
 
@@ -25,6 +26,34 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
     await updateLifeStory(editContent)
     setEditing(false)
   }
+
+  // Group emotions by event_id for quick lookup
+  const emotionsByEventId = useMemo(() => {
+    const map = new Map<string, typeof emotions>()
+    for (const emotion of emotions) {
+      if (emotion.event_id) {
+        const existing = map.get(emotion.event_id) || []
+        existing.push(emotion)
+        map.set(emotion.event_id, existing)
+      }
+    }
+    return map
+  }, [emotions])
+
+  // Sort emotions by importance (highest first)
+  const sortedEmotions = useMemo(
+    () => [...emotions].sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0)),
+    [emotions]
+  )
+
+  // Map event_id to event title for display
+  const eventTitleMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const event of events) {
+      map.set(event.id, event.title)
+    }
+    return map
+  }, [events])
 
   return (
     <div className="flex flex-col h-full">
@@ -62,6 +91,9 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
             </TabsTrigger>
             <TabsTrigger value="places">
               <MapPin className="w-3 h-3 mr-1" /> Helyszínek ({locations.length})
+            </TabsTrigger>
+            <TabsTrigger value="emotions">
+              <Heart className="w-3 h-3 mr-1" /> Érzelmek ({emotions.length})
             </TabsTrigger>
           </TabsList>
         </div>
@@ -104,19 +136,34 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
             <TabsContent value="events" className="mt-0 space-y-3">
               {events.length === 0 ? (
                 <p className="text-center py-20 text-muted-foreground">Még nincsenek események az életutadban.</p>
-              ) : events.map(event => (
-                <div key={event.id} className="border rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm">{event.title}</span>
-                    <Badge variant="secondary" className="text-xs">{event.category}</Badge>
-                    {event.is_turning_point && <Badge variant="default" className="text-xs">Fordulópont</Badge>}
+              ) : events.map(event => {
+                const eventEmotions = emotionsByEventId.get(event.id) || []
+                return (
+                  <div key={event.id} className="border rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-sm">{event.title}</span>
+                      <Badge variant="secondary" className="text-xs">{event.category}</Badge>
+                      {event.is_turning_point && <Badge variant="default" className="text-xs">Fordulópont</Badge>}
+                    </div>
+                    {event.description && <p className="text-xs mt-1">{event.description}</p>}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {event.exact_date || (event.estimated_year ? `~${event.estimated_year}` : event.life_phase || event.uncertain_time || 'Ismeretlen időpont')}
+                    </p>
+                    {eventEmotions.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {eventEmotions.map(emotion => (
+                          <EmotionBadge
+                            key={emotion.id}
+                            feeling={emotion.feeling}
+                            valence={emotion.valence}
+                            compact
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {event.description && <p className="text-xs mt-1">{event.description}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {event.exact_date || (event.estimated_year ? `~${event.estimated_year}` : event.life_phase || event.uncertain_time || 'Ismeretlen időpont')}
-                  </p>
-                </div>
-              ))}
+                )
+              })}
             </TabsContent>
             <TabsContent value="places" className="mt-0 space-y-3">
               {locations.length === 0 ? (
@@ -131,6 +178,38 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
                   {location.notes && <p className="text-xs mt-1">{location.notes}</p>}
                 </div>
               ))}
+            </TabsContent>
+            <TabsContent value="emotions" className="mt-0 space-y-3">
+              {sortedEmotions.length === 0 ? (
+                <p className="text-center py-20 text-muted-foreground">Még nincsenek érzelmek rögzítve. Mesélj az AI-nak az élményeidről, és automatikusan felismeri az érzelmeket!</p>
+              ) : sortedEmotions.map(emotion => {
+                const eventTitle = emotion.event_id ? eventTitleMap.get(emotion.event_id) : null
+                return (
+                  <div key={emotion.id} className="border rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <EmotionBadge
+                        feeling={emotion.feeling}
+                        valence={emotion.valence}
+                        importance={emotion.importance}
+                      />
+                    </div>
+                    {eventTitle && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        <Calendar className="w-3 h-3 inline mr-1" />
+                        {eventTitle}
+                      </p>
+                    )}
+                    {emotion.long_term_impact && (
+                      <p className="text-xs mt-1.5">
+                        <span className="font-medium">Hosszú távú hatás:</span> {emotion.long_term_impact}
+                      </p>
+                    )}
+                    {emotion.notes && (
+                      <p className="text-xs text-muted-foreground mt-1">{emotion.notes}</p>
+                    )}
+                  </div>
+                )
+              })}
             </TabsContent>
           </div>
         </ScrollArea>

@@ -6,11 +6,21 @@ import { Send } from 'lucide-react'
 interface ChatInputProps {
   onSend: (message: string) => void
   disabled?: boolean
+  pendingMessage?: string | null
+  onPendingConsumed?: () => void
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, pendingMessage, onPendingConsumed }: ChatInputProps) {
   const [value, setValue] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (pendingMessage) {
+      setValue(pendingMessage)
+      onPendingConsumed?.()
+      textareaRef.current?.focus()
+    }
+  }, [pendingMessage, onPendingConsumed])
 
   useEffect(() => {
     if (textareaRef.current) {

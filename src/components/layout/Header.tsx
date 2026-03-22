@@ -1,17 +1,18 @@
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthStore } from '@/stores/auth-store'
-import { BookOpen, Settings, LogOut, Menu, FileText } from 'lucide-react'
+import { BookOpen, Settings, LogOut, Menu, FileText, Clock } from 'lucide-react'
 
 interface HeaderProps {
   onToggleSidebar: () => void
   onShowLifeStory: () => void
+  onShowTimeline: () => void
   onShowSettings: () => void
   aiStatus: 'ok' | 'unknown' | 'error'
   storageStatus: 'ok' | 'error'
 }
 
-export function Header({ onToggleSidebar, onShowLifeStory, onShowSettings, aiStatus, storageStatus }: HeaderProps) {
+export function Header({ onToggleSidebar, onShowLifeStory, onShowTimeline, onShowSettings, aiStatus, storageStatus }: HeaderProps) {
   const { profile, signOut } = useAuthStore()
 
   const statusColor = (status: string) => {
@@ -60,6 +61,9 @@ export function Header({ onToggleSidebar, onShowLifeStory, onShowSettings, aiSta
         </div>
         <Button variant="ghost" size="icon" onClick={onShowLifeStory}>
           <FileText className="w-4 h-4" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={onShowTimeline}>
+          <Clock className="w-4 h-4" />
         </Button>
         <Button variant="ghost" size="icon" onClick={onShowSettings}>
           <Settings className="w-4 h-4" />
