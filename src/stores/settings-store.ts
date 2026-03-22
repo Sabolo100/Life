@@ -9,7 +9,7 @@ interface SettingsState extends AppSettings {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      aiModel: 'gpt-4.1-mini',
+      aiModel: 'gpt-4o-mini',
       ttsModel: 'eleven_multilingual_v2',
       ttsVoice: 'male',
       ttsSpeed: 1.0,

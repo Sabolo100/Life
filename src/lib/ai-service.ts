@@ -6,6 +6,8 @@ interface ChatRequest {
   openQuestions: string[]
   mode: string
   goal: string | null
+  aiModel?: string
+  emotionalLayer?: boolean
 }
 
 interface AIResponse {

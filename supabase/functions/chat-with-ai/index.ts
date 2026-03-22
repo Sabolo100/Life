@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
 
   try {
     const request: ChatRequest = await req.json()
-    const model = request.aiModel || 'gpt-4.1-mini'
+    const model = request.aiModel || 'gpt-4o-mini'
 
     const systemPrompt = buildSystemPrompt(request)
 

@@ -16,7 +16,7 @@ interface ChatViewProps {
 export function ChatView({ onShowLifeStory: _onShowLifeStory }: ChatViewProps) {
   const { messages, currentSession, sending, addMessage, setSending } = useChatStore()
   const { lifeStory, openQuestions, updateLifeStory, upsertEntities, updateOpenQuestions } = useLifeStoryStore()
-  const { topicHints } = useSettingsStore()
+  const { topicHints, aiModel, emotionalLayer } = useSettingsStore()
   const scrollRef = useRef<HTMLDivElement>(null)
   const suggestionsRef = useRef<string[]>([])
 
@@ -45,6 +45,8 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory }: ChatViewProps) {
         openQuestions: openQuestions.map(q => q.description),
         mode: currentSession.mode,
         goal: currentSession.goal,
+        aiModel,
+        emotionalLayer,
       })
 
       await addMessage(response.message, false)
