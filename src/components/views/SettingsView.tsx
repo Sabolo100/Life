@@ -82,8 +82,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                     <option value="gpt-5.4-mini">GPT-5.4 Mini</option>
                   </optgroup>
                   <optgroup label="Anthropic (Claude)">
-                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
-                    <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                    <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+                    <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
                   </optgroup>
                 </select>
               </div>

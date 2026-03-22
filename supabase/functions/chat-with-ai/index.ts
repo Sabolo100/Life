@@ -99,7 +99,7 @@ function isClaudeModel(model: string): boolean {
   return model.startsWith('claude-')
 }
 
-async function callOpenAI(model: string, systemPrompt: string, messages: { role: string; content: string }[]): Promise<{ success: boolean; content?: string; error?: string; details?: string }> {
+async function callOpenAI(model: string, systemPrompt: string, messages: { role: string; content: string }[], jsonMode = true): Promise<{ success: boolean; content?: string; error?: string; details?: string }> {
   if (!OPENAI_API_KEY) {
     return { success: false, error: 'OPENAI_API_KEY nincs beállítva a Supabase secrets-ben' }
   }
@@ -109,7 +109,17 @@ async function callOpenAI(model: string, systemPrompt: string, messages: { role:
     ...messages,
   ]
 
-  console.log(`[OpenAI] Calling model: ${model}, messages count: ${openaiMessages.length}`)
+  console.log(`[OpenAI] Calling model: ${model}, messages count: ${openaiMessages.length}, jsonMode: ${jsonMode}`)
+
+  const body: Record<string, unknown> = {
+    model,
+    messages: openaiMessages,
+    temperature: 0.7,
+    max_completion_tokens: 2000,
+  }
+  if (jsonMode) {
+    body.response_format = { type: 'json_object' }
+  }
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -117,13 +127,7 @@ async function callOpenAI(model: string, systemPrompt: string, messages: { role:
       'Authorization': `Bearer ${OPENAI_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model,
-      messages: openaiMessages,
-      temperature: 0.7,
-      max_completion_tokens: 2000,
-      response_format: { type: 'json_object' },
-    }),
+    body: JSON.stringify(body),
   })
 
   if (!response.ok) {
@@ -199,7 +203,7 @@ Deno.serve(async (req) => {
 
       const result = isClaude
         ? await callAnthropic(model, testSystemPrompt, testMessages)
-        : await callOpenAI(model, testSystemPrompt, testMessages)
+        : await callOpenAI(model, testSystemPrompt, testMessages, false)
 
       if (result.success) {
         return new Response(JSON.stringify({
