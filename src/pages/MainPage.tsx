@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Header } from '@/components/layout/Header'
 import { ChatView } from '@/components/chat/ChatView'
 import { SessionSidebar } from '@/components/chat/SessionSidebar'
@@ -15,8 +15,9 @@ export function MainPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [aiStatus] = useState<'ok' | 'unknown' | 'error'>('unknown')
   const [storageStatus] = useState<'ok' | 'error'>('ok')
+  const sessionInitialized = useRef(false)
 
-  const { loadSessions, sessions, createSession, currentSession } = useChatStore()
+  const { loadSessions, sessions, loading, createSession, currentSession } = useChatStore()
   const { loadAll } = useLifeStoryStore()
 
   useEffect(() => {
@@ -25,12 +26,18 @@ export function MainPage() {
   }, [loadSessions, loadAll])
 
   useEffect(() => {
+    // Várjuk meg, amíg a sessziók betöltése befejeződik
+    if (loading) return
+    // Ne fussunk le kétszer
+    if (sessionInitialized.current) return
+    sessionInitialized.current = true
+
     if (sessions.length > 0 && !currentSession) {
       useChatStore.getState().selectSession(sessions[0].id)
     } else if (sessions.length === 0) {
       createSession('free', null)
     }
-  }, [sessions, currentSession, createSession])
+  }, [sessions, currentSession, createSession, loading])
 
   return (
     <div className="h-screen flex flex-col">
