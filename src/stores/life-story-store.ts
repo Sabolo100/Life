@@ -89,23 +89,23 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
 
     if (entities.persons?.length) {
       const toInsert = entities.persons.map(p => ({ ...p, user_id: user.id }))
-      await supabase.from('persons').upsert(toInsert as Person[])
+      await supabase.from('persons').upsert(toInsert as Person[], { onConflict: 'user_id,name' })
     }
     if (entities.events?.length) {
       const toInsert = entities.events.map(e => ({ ...e, user_id: user.id }))
-      await supabase.from('events').upsert(toInsert as LifeEvent[])
+      await supabase.from('events').upsert(toInsert as LifeEvent[], { onConflict: 'user_id,title' })
     }
     if (entities.locations?.length) {
       const toInsert = entities.locations.map(l => ({ ...l, user_id: user.id }))
-      await supabase.from('locations').upsert(toInsert as Location[])
+      await supabase.from('locations').upsert(toInsert as Location[], { onConflict: 'user_id,name' })
     }
     if (entities.timePeriods?.length) {
       const toInsert = entities.timePeriods.map(t => ({ ...t, user_id: user.id }))
-      await supabase.from('time_periods').upsert(toInsert as TimePeriod[])
+      await supabase.from('time_periods').upsert(toInsert as TimePeriod[], { onConflict: 'user_id,name' })
     }
     if (entities.emotions?.length) {
       const toInsert = entities.emotions.map(e => ({ ...e, user_id: user.id }))
-      await supabase.from('emotions').upsert(toInsert as Emotion[])
+      await supabase.from('emotions').upsert(toInsert as Emotion[], { onConflict: 'user_id,name' })
     }
 
     await get().loadAll()

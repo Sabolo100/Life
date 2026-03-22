@@ -21,7 +21,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sessions: [],
   currentSession: null,
   messages: [],
-  loading: false,
+  loading: true,
   sending: false,
 
   loadSessions: async () => {

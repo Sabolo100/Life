@@ -92,7 +92,10 @@ FONTOS:
 - Ha nincs új entitás, az extractedEntities legyen null
 - A suggestions 3 rövid, változatos témájú folytatási javaslat legyen (max 8 szó)
 - Az openQuestions-ben frissítsd a nyitott kérdések listáját (új kérdések, lezárt kérdések)
-- A lifeStoryUpdate legyen tömör, tényszerű összefoglalás (nem a beszélgetés másolata)`
+- A lifeStoryUpdate legyen tömör, tényszerű összefoglalás (nem a beszélgetés másolata)
+- HELYSZÍNEK: Egy helyszín CSAK EGYSZER szerepelhet a locations listában, ne add hozzá többször különböző típusokkal (pl. Parádfürdő csak egyszer, nem külön "kórház", "lakóhely", "gyerekkor helyszíne" stb.)
+- SZEMÉLYEK: Egy személy CSAK EGYSZER szerepelhet a persons listában, még ha több szerepe is volt
+- CSAK VALÓBAN ÚJ entitásokat adj hozzá - ha egy helyszín/személy már valószínűleg szerepel az életútban, ne add újra`
 }
 
 function isClaudeModel(model: string): boolean {
