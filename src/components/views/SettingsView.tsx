@@ -49,8 +49,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                   className="text-sm border rounded-md px-2 py-1"
                 >
                   <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+                  <option value="gpt-4o-mini">GPT-4o Mini</option>
                   <option value="gpt-4.1">GPT-4.1</option>
                   <option value="gpt-4o">GPT-4o</option>
+                  <option value="gpt-5.4-mini">GPT-5.4 Mini</option>
                 </select>
               </div>
               <div className="flex justify-between items-center">

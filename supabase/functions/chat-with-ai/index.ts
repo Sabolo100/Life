@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
 
   try {
     const request: ChatRequest = await req.json()
-    const model = request.aiModel || 'gpt-4o-mini'
+    const model = request.aiModel || 'gpt-4.1-mini'
 
     const systemPrompt = buildSystemPrompt(request)
 
@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
         model,
         messages: openaiMessages,
         temperature: 0.7,
-        max_tokens: 2000,
+        max_completion_tokens: 2000,
         response_format: { type: 'json_object' },
       }),
     })
