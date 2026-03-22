@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') || ''
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || ''
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,6 +17,7 @@ interface ChatRequest {
   aiModel?: string
   emotionalLayer?: boolean
   topicHints?: boolean
+  test?: boolean // API test mode
 }
 
 const MODE_INSTRUCTIONS: Record<string, string> = {
@@ -93,6 +95,89 @@ FONTOS:
 - A lifeStoryUpdate legyen tömör, tényszerű összefoglalás (nem a beszélgetés másolata)`
 }
 
+function isClaudeModel(model: string): boolean {
+  return model.startsWith('claude-')
+}
+
+async function callOpenAI(model: string, systemPrompt: string, messages: { role: string; content: string }[]): Promise<{ success: boolean; content?: string; error?: string; details?: string }> {
+  if (!OPENAI_API_KEY) {
+    return { success: false, error: 'OPENAI_API_KEY nincs beállítva a Supabase secrets-ben' }
+  }
+
+  const openaiMessages = [
+    { role: 'system', content: systemPrompt },
+    ...messages,
+  ]
+
+  console.log(`[OpenAI] Calling model: ${model}, messages count: ${openaiMessages.length}`)
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: openaiMessages,
+      temperature: 0.7,
+      max_completion_tokens: 2000,
+      response_format: { type: 'json_object' },
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error(`[OpenAI] API error ${response.status}:`, errorText)
+    return {
+      success: false,
+      error: `OpenAI API hiba (${response.status})`,
+      details: errorText,
+    }
+  }
+
+  const data = await response.json()
+  console.log(`[OpenAI] Success. Usage:`, JSON.stringify(data.usage))
+  return { success: true, content: data.choices[0].message.content }
+}
+
+async function callAnthropic(model: string, systemPrompt: string, messages: { role: string; content: string }[]): Promise<{ success: boolean; content?: string; error?: string; details?: string }> {
+  if (!ANTHROPIC_API_KEY) {
+    return { success: false, error: 'ANTHROPIC_API_KEY nincs beállítva a Supabase secrets-ben' }
+  }
+
+  console.log(`[Anthropic] Calling model: ${model}, messages count: ${messages.length}`)
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 2000,
+      system: systemPrompt,
+      messages: messages.map(m => ({ role: m.role, content: m.content })),
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error(`[Anthropic] API error ${response.status}:`, errorText)
+    return {
+      success: false,
+      error: `Anthropic API hiba (${response.status})`,
+      details: errorText,
+    }
+  }
+
+  const data = await response.json()
+  console.log(`[Anthropic] Success. Usage:`, JSON.stringify(data.usage))
+  return { success: true, content: data.content[0].text }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -101,58 +186,110 @@ Deno.serve(async (req) => {
   try {
     const request: ChatRequest = await req.json()
     const model = request.aiModel || 'gpt-4.1-mini'
+    const isClaude = isClaudeModel(model)
 
-    const systemPrompt = buildSystemPrompt(request)
+    console.log(`[Edge Function] Request received. Model: ${model}, Test: ${request.test}, Claude: ${isClaude}`)
 
-    const openaiMessages = [
-      { role: 'system', content: systemPrompt },
-      ...request.messages.map(m => ({ role: m.role, content: m.content })),
-    ]
+    // === TEST MODE ===
+    if (request.test) {
+      console.log(`[Test] Testing ${isClaude ? 'Anthropic' : 'OpenAI'} API with model: ${model}`)
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages: openaiMessages,
-        temperature: 0.7,
-        max_completion_tokens: 2000,
-        response_format: { type: 'json_object' },
-      }),
-    })
+      const testSystemPrompt = 'Válaszolj egyetlen rövid mondatban magyarul.'
+      const testMessages = [{ role: 'user', content: 'Szia! Működsz?' }]
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('OpenAI API error:', errorText)
-      throw new Error(`OpenAI API error: ${response.status}`)
+      const result = isClaude
+        ? await callAnthropic(model, testSystemPrompt, testMessages)
+        : await callOpenAI(model, testSystemPrompt, testMessages)
+
+      if (result.success) {
+        return new Response(JSON.stringify({
+          test: true,
+          success: true,
+          model,
+          provider: isClaude ? 'Anthropic' : 'OpenAI',
+          response: result.content,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      } else {
+        return new Response(JSON.stringify({
+          test: true,
+          success: false,
+          model,
+          provider: isClaude ? 'Anthropic' : 'OpenAI',
+          error: result.error,
+          details: result.details,
+        }), {
+          status: 200, // Return 200 so frontend can read the error details
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
     }
 
-    const data = await response.json()
-    const content = data.choices[0].message.content
+    // === NORMAL CHAT MODE ===
+    const systemPrompt = buildSystemPrompt(request)
+    const chatMessages = request.messages.map(m => ({ role: m.role, content: m.content }))
+
+    const result = isClaude
+      ? await callAnthropic(model, systemPrompt, chatMessages)
+      : await callOpenAI(model, systemPrompt, chatMessages)
+
+    if (!result.success) {
+      console.error(`[Edge Function] AI call failed:`, result.error, result.details)
+      return new Response(
+        JSON.stringify({
+          error: result.error,
+          details: result.details,
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
 
     let parsed
     try {
-      parsed = JSON.parse(content)
+      parsed = JSON.parse(result.content!)
     } catch {
-      parsed = {
-        message: content,
-        lifeStoryUpdate: null,
-        extractedEntities: null,
-        suggestions: [],
-        openQuestions: [],
+      console.warn(`[Edge Function] Could not parse AI response as JSON, using raw text. Raw:`, result.content?.slice(0, 200))
+      // Try to extract JSON from the response (Claude sometimes wraps it in markdown)
+      const jsonMatch = result.content?.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        try {
+          parsed = JSON.parse(jsonMatch[0])
+        } catch {
+          parsed = {
+            message: result.content,
+            lifeStoryUpdate: null,
+            extractedEntities: null,
+            suggestions: [],
+            openQuestions: [],
+          }
+        }
+      } else {
+        parsed = {
+          message: result.content,
+          lifeStoryUpdate: null,
+          extractedEntities: null,
+          suggestions: [],
+          openQuestions: [],
+        }
       }
     }
+
+    console.log(`[Edge Function] Response parsed successfully. Has message: ${!!parsed.message}`)
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
-    console.error('Edge function error:', error)
+    console.error('[Edge Function] Unhandled error:', error)
     return new Response(
-      JSON.stringify({ error: (error as Error).message }),
+      JSON.stringify({
+        error: `Edge Function hiba: ${(error as Error).message}`,
+        stack: (error as Error).stack,
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

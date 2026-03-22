@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { useSettingsStore } from '@/stores/settings-store'
 import { useAuthStore } from '@/stores/auth-store'
+import { testAIConnection, type AITestResult } from '@/lib/ai-service'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle2, XCircle, Zap } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface SettingsViewProps {
@@ -13,6 +15,27 @@ interface SettingsViewProps {
 export function SettingsView({ onBack }: SettingsViewProps) {
   const settings = useSettingsStore()
   const { profile } = useAuthStore()
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<AITestResult | null>(null)
+
+  const handleTestAI = async () => {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const result = await testAIConnection(settings.aiModel)
+      setTestResult(result)
+    } catch (err) {
+      setTestResult({
+        test: true,
+        success: false,
+        model: settings.aiModel,
+        provider: settings.aiModel.startsWith('claude-') ? 'Anthropic' : 'OpenAI',
+        error: `Váratlan hiba: ${(err as Error).message}`,
+      })
+    } finally {
+      setTesting(false)
+    }
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -45,16 +68,90 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 <Label>AI modell</Label>
                 <select
                   value={settings.aiModel}
-                  onChange={e => settings.updateSettings({ aiModel: e.target.value })}
+                  onChange={e => {
+                    settings.updateSettings({ aiModel: e.target.value })
+                    setTestResult(null) // Reset test when model changes
+                  }}
                   className="text-sm border rounded-md px-2 py-1"
                 >
-                  <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
-                  <option value="gpt-4o-mini">GPT-4o Mini</option>
-                  <option value="gpt-4.1">GPT-4.1</option>
-                  <option value="gpt-4o">GPT-4o</option>
-                  <option value="gpt-5.4-mini">GPT-5.4 Mini</option>
+                  <optgroup label="OpenAI">
+                    <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                    <option value="gpt-4.1">GPT-4.1</option>
+                    <option value="gpt-4o">GPT-4o</option>
+                    <option value="gpt-5.4-mini">GPT-5.4 Mini</option>
+                  </optgroup>
+                  <optgroup label="Anthropic (Claude)">
+                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+                    <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                  </optgroup>
                 </select>
               </div>
+
+              {/* API Test Button */}
+              <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <Label className="text-xs font-medium">API Kapcsolat Teszt</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Ellenőrzi, hogy a kiválasztott modell elérhető-e
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleTestAI}
+                    disabled={testing}
+                    className="gap-1.5"
+                  >
+                    {testing ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Tesztelés...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-3.5 h-3.5" />
+                        Teszt
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {testResult && (
+                  <div className={`rounded-md p-2.5 text-xs space-y-1 ${
+                    testResult.success
+                      ? 'bg-green-50 border border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200'
+                      : 'bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200'
+                  }`}>
+                    <div className="flex items-center gap-1.5 font-medium">
+                      {testResult.success ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+                      )}
+                      {testResult.success ? 'Sikeres kapcsolat!' : 'Hiba történt!'}
+                    </div>
+                    <div><strong>Modell:</strong> {testResult.model}</div>
+                    <div><strong>Provider:</strong> {testResult.provider}</div>
+                    {testResult.success && testResult.response && (
+                      <div><strong>AI válasz:</strong> "{testResult.response}"</div>
+                    )}
+                    {!testResult.success && testResult.error && (
+                      <div><strong>Hiba:</strong> {testResult.error}</div>
+                    )}
+                    {!testResult.success && testResult.details && (
+                      <details className="mt-1">
+                        <summary className="cursor-pointer font-medium">Részletes hibaüzenet</summary>
+                        <pre className="mt-1 whitespace-pre-wrap break-all text-[10px] bg-white/50 dark:bg-black/20 p-1.5 rounded">
+                          {testResult.details}
+                        </pre>
+                      </details>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-between items-center">
                 <div>
                   <Label>Témajavaslatok</Label>

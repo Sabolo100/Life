@@ -68,7 +68,9 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory }: ChatViewProps) {
 
       suggestionsRef.current = response.suggestions || []
     } catch (err) {
-      await addMessage('Sajnálom, hiba történt a válasz generálásakor. Kérlek próbáld újra.', false)
+      const errorMsg = err instanceof Error ? err.message : 'Ismeretlen hiba'
+      console.error('[ChatView] AI error:', errorMsg)
+      await addMessage(`⚠️ Hiba történt: ${errorMsg}\n\nTipp: Menj a Beállítások → API Teszt gombra a probléma diagnosztizálásához.`, false)
     } finally {
       setSending(false)
     }
