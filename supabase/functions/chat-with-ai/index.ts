@@ -68,10 +68,23 @@ const GOAL_CATEGORY_MAP: Record<string, string[]> = {
 
 // ========== RECORDER AGENT ==========
 
-function buildRecorderPrompt(existingTitles: string[], recentMessages: { role: string; content: string }[]): string {
+function buildRecorderPrompt(
+  existingTitles: string[],
+  existingLocationNames: string[],
+  existingPersonNames: string[],
+  recentMessages: { role: string; content: string }[]
+): string {
   const titlesStr = existingTitles.length > 0
     ? `Létező event címek (ha pontosít, PONTOSAN ezt a title-t használd): ${existingTitles.join(', ')}`
     : 'Még nincsenek események rögzítve.'
+
+  const locationsStr = existingLocationNames.length > 0
+    ? `Létező helyszín nevek (ha már létezik, PONTOSAN ezt a nevet használd): ${existingLocationNames.join(', ')}`
+    : ''
+
+  const personsStr = existingPersonNames.length > 0
+    ? `Létező személy nevek (ha már létezik, PONTOSAN ezt a nevet használd): ${existingPersonNames.join(', ')}`
+    : ''
 
   const contextMessages = recentMessages.slice(-4).map(m =>
     `${m.role === 'user' ? 'Felhasználó' : 'AI'}: ${m.content}`
@@ -84,13 +97,15 @@ SZABÁLYOK:
 - Ha meglévő event-et pontosít, PONTOSAN ugyanazt a title-t használd
 - narrative_text: 1-3 mondat, harmadik személyű, életrajzi stílus, múlt idő. Példa: "Szabolcs 1985-ben született Budapesten. A család egy panellakásban élt a XIII. kerületben."
 - NE generálj beszélgetős választ, CSAK adatot rögzíts
-- Egy helyszín CSAK EGYSZER szerepelhet
-- Egy személy CSAK EGYSZER szerepelhet
+- Egy helyszín CSAK EGYSZER szerepelhet. Ha a helyszín már létezik a "Létező helyszín nevek" listában, PONTOSAN ugyanazt a nevet használd (betűről betűre egyezzen!). NE hozz létre új variánst (pl. ha "Fáy András iskola" létezik, NE írd "Fáy András Általános Iskola"-nak)
+- Egy személy CSAK EGYSZER szerepelhet. Ha a személy már létezik a "Létező személy nevek" listában, PONTOSAN ugyanazt a nevet használd
 - ESEMÉNYEK FRISSÍTÉSE: Ha a felhasználó pontosít egy korábbi eseményt (pl. megadja a dátumot), NE hozz létre új eseményt — használd PONTOSAN UGYANAZT a title-t
 - Ha nincs új tény az üzenetben (pl. csak üdvözlés, kérdés, köszönés), adj vissza üres listákat
 - DÁTUM FORMÁTUM: exact_date CSAK egyetlen nap lehet YYYY-MM-DD formátumban (pl. "1985-03-15"). Ha időszakról van szó (pl. "1977-1984"), NE használd az exact_date mezőt! Helyette: time_type="estimated_year", estimated_year=1977 (a kezdő év), és a teljes időszakot a life_phase mezőbe írd (pl. "1977-1984").
 
 ${titlesStr}
+${locationsStr}
+${personsStr}
 
 Utolsó beszélgetés kontextus:
 ${contextMessages}
@@ -259,24 +274,45 @@ function parseAIJSON(raw: string | undefined): Record<string, unknown> | null {
 
 // ========== DB HELPER: fetch existing events for context ==========
 
-async function fetchExistingEvents(userId: string): Promise<{ id: string; title: string; category: string; narrative_text: string | null; is_turning_point: boolean; exact_date: string | null; estimated_year: number | null; life_phase: string | null }[]> {
+interface ExistingData {
+  events: { id: string; title: string; category: string; narrative_text: string | null; is_turning_point: boolean; exact_date: string | null; estimated_year: number | null; life_phase: string | null }[]
+  locationNames: string[]
+  personNames: string[]
+}
+
+async function fetchExistingData(userId: string): Promise<ExistingData> {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     console.warn('[DB] No Supabase credentials for DB queries')
-    return []
+    return { events: [], locationNames: [], personNames: [] }
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-  const { data, error } = await supabase
-    .from('events')
-    .select('id, title, category, narrative_text, is_turning_point, exact_date, estimated_year, life_phase')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true })
 
-  if (error) {
-    console.error('[DB] Error fetching events:', error.message)
-    return []
+  const [eventsRes, locationsRes, personsRes] = await Promise.all([
+    supabase
+      .from('events')
+      .select('id, title, category, narrative_text, is_turning_point, exact_date, estimated_year, life_phase')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('locations')
+      .select('name')
+      .eq('user_id', userId),
+    supabase
+      .from('persons')
+      .select('name')
+      .eq('user_id', userId),
+  ])
+
+  if (eventsRes.error) console.error('[DB] Error fetching events:', eventsRes.error.message)
+  if (locationsRes.error) console.error('[DB] Error fetching locations:', locationsRes.error.message)
+  if (personsRes.error) console.error('[DB] Error fetching persons:', personsRes.error.message)
+
+  return {
+    events: eventsRes.data || [],
+    locationNames: (locationsRes.data || []).map(l => l.name),
+    personNames: (personsRes.data || []).map(p => p.name),
   }
-  return data || []
 }
 
 // ========== FILTER EVENTS FOR INTERVIEWER ==========
@@ -359,19 +395,19 @@ Deno.serve(async (req) => {
     const chatMessages = request.messages.map(m => ({ role: m.role, content: m.content }))
     const userId = request.userId || ''
 
-    // Fetch existing events from DB for context
-    let existingEvents: Awaited<ReturnType<typeof fetchExistingEvents>> = []
+    // Fetch existing data from DB for context
+    let existingData: ExistingData = { events: [], locationNames: [], personNames: [] }
     if (userId) {
-      existingEvents = await fetchExistingEvents(userId)
+      existingData = await fetchExistingData(userId)
     }
 
-    const existingTitles = existingEvents.map(e => e.title)
+    const existingTitles = existingData.events.map(e => e.title)
 
     // Build prompts
-    const recorderPrompt = buildRecorderPrompt(existingTitles, chatMessages)
+    const recorderPrompt = buildRecorderPrompt(existingTitles, existingData.locationNames, existingData.personNames, chatMessages)
     const recorderMessages = chatMessages.slice(-5) // last 5 messages for recorder
 
-    const filteredSummaries = filterEventsForInterviewer(existingEvents, request.mode, request.goal)
+    const filteredSummaries = filterEventsForInterviewer(existingData.events, request.mode, request.goal)
     const interviewerPrompt = buildInterviewerPrompt(request, filteredSummaries)
     const interviewerMessages = chatMessages.slice(-10) // last 10 messages for interviewer
 
