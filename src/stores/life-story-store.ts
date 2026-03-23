@@ -105,7 +105,21 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
       else console.log('[upsertEntities] persons upserted:', toInsert.length)
     }
     if (entities.events?.length) {
-      const toInsert = entities.events.map(e => ({ ...e, user_id: user.id }))
+      const toInsert = entities.events.map(e => {
+        const event = { ...e, user_id: user.id }
+        // Sanitize exact_date: must be YYYY-MM-DD format, otherwise move to estimated_year
+        if (event.exact_date && !/^\d{4}-\d{2}-\d{2}$/.test(event.exact_date as string)) {
+          const yearMatch = (event.exact_date as string).match(/(\d{4})/)
+          if (yearMatch) {
+            event.estimated_year = parseInt(yearMatch[1])
+            event.life_phase = event.exact_date as string
+            event.time_type = 'estimated_year'
+          }
+          event.exact_date = null
+          console.log('[upsertEntities] Sanitized invalid exact_date to estimated_year:', event.estimated_year)
+        }
+        return event
+      })
       const { error } = await supabase.from('events').upsert(toInsert as LifeEvent[], { onConflict: 'user_id,title' })
       if (error) console.error('[upsertEntities] events error:', error)
       else console.log('[upsertEntities] events upserted:', toInsert.length)
