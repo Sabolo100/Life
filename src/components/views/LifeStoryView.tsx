@@ -1,11 +1,10 @@
 import { useState, useMemo } from 'react'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Edit3, Save, X, Users, MapPin, Calendar, Heart, Download, FileText, FileJson } from 'lucide-react'
+import { ArrowLeft, Users, MapPin, Calendar, Heart, Download, FileText, FileJson } from 'lucide-react'
 import { EmotionBadge } from './EmotionBadge'
 import { useAuthStore } from '@/stores/auth-store'
 import { exportAsJSON, exportAsPDF, exportAsDOCX } from '@/lib/export-service'
@@ -14,11 +13,20 @@ interface LifeStoryViewProps {
   onBack: () => void
 }
 
+function sortEventsByTime(events: { exact_date?: string | null; estimated_year?: number | null; life_phase?: string | null; created_at?: string }[]) {
+  return [...events].sort((a, b) => {
+    const yearA = a.estimated_year ?? (a.exact_date ? new Date(a.exact_date).getFullYear() : 9999)
+    const yearB = b.estimated_year ?? (b.exact_date ? new Date(b.exact_date).getFullYear() : 9999)
+    if (yearA !== yearB) return yearA - yearB
+    // If same year, sort by exact_date if available
+    if (a.exact_date && b.exact_date) return a.exact_date.localeCompare(b.exact_date)
+    return 0
+  })
+}
+
 export function LifeStoryView({ onBack }: LifeStoryViewProps) {
-  const { lifeStory, persons, events, locations, timePeriods, emotions, openQuestions, updateLifeStory } = useLifeStoryStore()
+  const { lifeStory, persons, events, locations, timePeriods, emotions, openQuestions } = useLifeStoryStore()
   const { profile } = useAuthStore()
-  const [editing, setEditing] = useState(false)
-  const [editContent, setEditContent] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
 
   const exportData = {
@@ -26,15 +34,20 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
     displayName: profile?.display_name || undefined,
   }
 
-  const handleStartEdit = () => {
-    setEditContent(lifeStory?.content || '')
-    setEditing(true)
-  }
+  // Build narrative text from event records
+  const narrativeText = useMemo(() => {
+    const sorted = sortEventsByTime(events) as typeof events
+    const paragraphs: string[] = []
 
-  const handleSave = async () => {
-    await updateLifeStory(editContent)
-    setEditing(false)
-  }
+    for (const event of sorted) {
+      const text = event.narrative_text || event.description
+      if (text) {
+        paragraphs.push(text)
+      }
+    }
+
+    return paragraphs.join('\n\n')
+  }, [events])
 
   // Group emotions by event_id for quick lookup
   const emotionsByEventId = useMemo(() => {
@@ -74,49 +87,33 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
           <h2 className="font-semibold">Életutam</h2>
         </div>
         <div className="flex gap-2">
-          {editing ? (
-            <>
-              <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
-                <X className="w-4 h-4 mr-1" /> Mégse
-              </Button>
-              <Button size="sm" onClick={handleSave}>
-                <Save className="w-4 h-4 mr-1" /> Mentés
-              </Button>
-            </>
-          ) : (
-            <>
-              <div className="relative">
-                <Button variant="outline" size="sm" onClick={() => setShowExportMenu(!showExportMenu)}>
-                  <Download className="w-4 h-4 mr-1" /> Export
-                </Button>
-                {showExportMenu && (
-                  <div className="absolute right-0 top-full mt-1 bg-popover border rounded-lg shadow-lg py-1 z-50 w-48">
-                    <button
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
-                      onClick={() => { exportAsPDF(exportData); setShowExportMenu(false) }}
-                    >
-                      <FileText className="w-4 h-4" /> PDF letöltés
-                    </button>
-                    <button
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
-                      onClick={() => { exportAsDOCX(exportData); setShowExportMenu(false) }}
-                    >
-                      <FileText className="w-4 h-4" /> Word (DOCX) letöltés
-                    </button>
-                    <button
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
-                      onClick={() => { exportAsJSON(exportData); setShowExportMenu(false) }}
-                    >
-                      <FileJson className="w-4 h-4" /> JSON letöltés
-                    </button>
-                  </div>
-                )}
+          <div className="relative">
+            <Button variant="outline" size="sm" onClick={() => setShowExportMenu(!showExportMenu)}>
+              <Download className="w-4 h-4 mr-1" /> Export
+            </Button>
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1 bg-popover border rounded-lg shadow-lg py-1 z-50 w-48">
+                <button
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
+                  onClick={() => { exportAsPDF(exportData); setShowExportMenu(false) }}
+                >
+                  <FileText className="w-4 h-4" /> PDF letöltés
+                </button>
+                <button
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
+                  onClick={() => { exportAsDOCX(exportData); setShowExportMenu(false) }}
+                >
+                  <FileText className="w-4 h-4" /> Word (DOCX) letöltés
+                </button>
+                <button
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
+                  onClick={() => { exportAsJSON(exportData); setShowExportMenu(false) }}
+                >
+                  <FileJson className="w-4 h-4" /> JSON letöltés
+                </button>
               </div>
-              <Button variant="outline" size="sm" onClick={handleStartEdit}>
-                <Edit3 className="w-4 h-4 mr-1" /> Szerkesztés
-              </Button>
-            </>
-          )}
+            )}
+          </div>
         </div>
       </div>
       <Tabs defaultValue="story" className="flex-1 flex flex-col">
@@ -140,15 +137,9 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
         <ScrollArea className="flex-1 p-4">
           <div className="max-w-3xl mx-auto">
             <TabsContent value="story" className="mt-0">
-              {editing ? (
-                <Textarea
-                  value={editContent}
-                  onChange={e => setEditContent(e.target.value)}
-                  className="min-h-[400px] font-mono text-sm"
-                />
-              ) : lifeStory?.content ? (
+              {narrativeText ? (
                 <div className="prose prose-sm max-w-none">
-                  {lifeStory.content.split('\n').map((line, i) => (
+                  {narrativeText.split('\n').map((line, i) => (
                     <p key={i} className={line.trim() === '' ? 'h-4' : ''}>{line}</p>
                   ))}
                 </div>
@@ -185,6 +176,7 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
                       <Badge variant="secondary" className="text-xs">{event.category}</Badge>
                       {event.is_turning_point && <Badge variant="default" className="text-xs">Fordulópont</Badge>}
                     </div>
+                    {event.narrative_text && <p className="text-xs mt-1 italic text-muted-foreground">{event.narrative_text}</p>}
                     {event.description && <p className="text-xs mt-1">{event.description}</p>}
                     <p className="text-xs text-muted-foreground mt-1">
                       {event.exact_date || (event.estimated_year ? `~${event.estimated_year}` : event.life_phase || event.uncertain_time || 'Ismeretlen időpont')}

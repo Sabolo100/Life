@@ -72,6 +72,8 @@ export interface LifeEvent {
   person_ids: string[]
   category: string
   is_turning_point: boolean
+  narrative_text: string | null
+  source_message_id: string | null
   source: 'self' | 'invited_person'
   created_at: string
 }
@@ -126,7 +128,7 @@ export interface OpenQuestion {
 // AI response types
 export interface AIResponse {
   message: string
-  lifeStoryUpdate: string | null
+  messageTags: string[]
   extractedEntities: {
     persons: Partial<Person>[]
     events: Partial<LifeEvent>[]

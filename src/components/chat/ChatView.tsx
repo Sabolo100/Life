@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useChatStore } from '@/stores/chat-store'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { useSettingsStore } from '@/stores/settings-store'
+import { useAuthStore } from '@/stores/auth-store'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { SuggestionChips } from './SuggestionChips'
@@ -17,8 +18,9 @@ interface ChatViewProps {
 
 export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, onPendingConsumed }: ChatViewProps) {
   const { messages, currentSession, sending, addMessage, setSending } = useChatStore()
-  const { lifeStory, openQuestions, updateLifeStory, upsertEntities, updateOpenQuestions } = useLifeStoryStore()
+  const { openQuestions, upsertEntities, updateOpenQuestions } = useLifeStoryStore()
   const { topicHints, aiModel, emotionalLayer, ttsEnabled } = useSettingsStore()
+  const { profile } = useAuthStore()
   const scrollRef = useRef<HTMLDivElement>(null)
   const suggestionsRef = useRef<string[]>([])
 
@@ -48,23 +50,18 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
 
       const response = await sendChatMessage({
         messages: recentMessages,
-        lifeStory: lifeStory?.content || '',
         openQuestions: openQuestions.map(q => q.description),
         mode: currentSession.mode,
         goal: currentSession.goal,
         aiModel,
         emotionalLayer,
+        userId: profile?.id,
       })
 
       await addMessage(response.message, false)
 
       if (ttsEnabled) {
         speakText(response.message)
-      }
-
-      if (response.lifeStoryUpdate) {
-        // Az AI a TELJES frissített életutat adja vissza (nem csak a deltát)
-        await updateLifeStory(response.lifeStoryUpdate)
       }
 
       if (response.extractedEntities) {

@@ -121,10 +121,14 @@ export function exportAsPDF(data: ExportData) {
   const title = `Eletut - ${data.displayName || 'Eletutam'}`
   addTitle(title)
 
-  // Life story
-  if (data.lifeStory?.content) {
+  // Life story (from event narrative_text fields)
+  const sortedNarrativeEvents = sortEventsByTime(data.events)
+  const narrativeParagraphs = sortedNarrativeEvents
+    .map(e => e.narrative_text || e.description)
+    .filter(Boolean) as string[]
+  if (narrativeParagraphs.length > 0) {
     addSectionHeader('Elettortenet')
-    addText(data.lifeStory.content)
+    addText(narrativeParagraphs.join('\n\n'))
   }
 
   // Persons
@@ -230,8 +234,12 @@ export async function exportAsDOCX(data: ExportData) {
     })
   )
 
-  // Life story
-  if (data.lifeStory?.content) {
+  // Life story (from event narrative_text fields)
+  const docxNarrativeEvents = sortEventsByTime(data.events)
+  const docxNarratives = docxNarrativeEvents
+    .map(e => e.narrative_text || e.description)
+    .filter(Boolean) as string[]
+  if (docxNarratives.length > 0) {
     children.push(
       new Paragraph({
         text: 'Élettörténet',
@@ -239,10 +247,10 @@ export async function exportAsDOCX(data: ExportData) {
         spacing: { before: 400, after: 200 },
       })
     )
-    for (const line of data.lifeStory.content.split('\n')) {
+    for (const text of docxNarratives) {
       children.push(
         new Paragraph({
-          children: [new TextRun({ text: line, size: 22 })],
+          children: [new TextRun({ text, size: 22 })],
           spacing: { after: 100 },
         })
       )

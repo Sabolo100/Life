@@ -2,17 +2,17 @@ import { supabase } from './supabase'
 
 interface ChatRequest {
   messages: { role: 'user' | 'assistant'; content: string }[]
-  lifeStory: string
   openQuestions: string[]
   mode: string
   goal: string | null
   aiModel?: string
   emotionalLayer?: boolean
+  userId?: string
 }
 
 interface AIResponse {
   message: string
-  lifeStoryUpdate: string | null
+  messageTags: string[]
   extractedEntities: {
     persons: Record<string, unknown>[]
     events: Record<string, unknown>[]
@@ -69,7 +69,6 @@ export async function testAIConnection(model: string): Promise<AITestResult> {
         test: true,
         aiModel: model,
         messages: [],
-        lifeStory: '',
         openQuestions: [],
         mode: 'free',
         goal: null,

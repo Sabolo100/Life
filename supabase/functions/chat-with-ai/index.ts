@@ -1,7 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') || ''
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || ''
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,14 +13,14 @@ const corsHeaders = {
 
 interface ChatRequest {
   messages: { role: 'user' | 'assistant'; content: string }[]
-  lifeStory: string
   openQuestions: string[]
   mode: string
   goal: string | null
   aiModel?: string
   emotionalLayer?: boolean
   topicHints?: boolean
-  test?: boolean // API test mode
+  userId?: string
+  test?: boolean
 }
 
 const MODE_INSTRUCTIONS: Record<string, string> = {
@@ -40,7 +43,75 @@ const GOAL_LABELS: Record<string, string> = {
   turning_points: 'fordulópontok',
 }
 
-function buildSystemPrompt(request: ChatRequest): string {
+// Category filtering map for Interviewer context
+const MODE_CATEGORY_MAP: Record<string, string[]> = {
+  career: ['career', 'education'],
+  family: ['family', 'relationship'],
+  childhood: ['childhood', 'education', 'family'],
+  travel: ['travel'],
+  interview: ['career', 'education', 'family', 'relationship'],
+  timeline: [], // gets all
+}
+
+// Same map for goals
+const GOAL_CATEGORY_MAP: Record<string, string[]> = {
+  childhood: ['childhood', 'education', 'family'],
+  family: ['family', 'relationship'],
+  career: ['career', 'education'],
+  education: ['education'],
+  relationships: ['relationship', 'family'],
+  travel: ['travel'],
+  hardships: ['hardship', 'health', 'loss'],
+  fond_memories: ['childhood', 'family', 'travel', 'relationship'],
+  turning_points: [], // gets turning points only
+}
+
+// ========== RECORDER AGENT ==========
+
+function buildRecorderPrompt(existingTitles: string[], recentMessages: { role: string; content: string }[]): string {
+  const titlesStr = existingTitles.length > 0
+    ? `Létező event címek (ha pontosít, PONTOSAN ezt a title-t használd): ${existingTitles.join(', ')}`
+    : 'Még nincsenek események rögzítve.'
+
+  const contextMessages = recentMessages.slice(-4).map(m =>
+    `${m.role === 'user' ? 'Felhasználó' : 'AI'}: ${m.content}`
+  ).join('\n')
+
+  return `Te egy precíz magyar nyelvű adatrögzítő AI vagy. A felhasználó üzenetéből kinyered a tényeket és strukturált adatokká alakítod.
+
+SZABÁLYOK:
+- Csak a felhasználó által MONDOTT tényeket rögzítsd, NE az AI kérdéseit
+- Ha meglévő event-et pontosít, PONTOSAN ugyanazt a title-t használd
+- narrative_text: 1-3 mondat, harmadik személyű, életrajzi stílus, múlt idő. Példa: "Szabolcs 1985-ben született Budapesten. A család egy panellakásban élt a XIII. kerületben."
+- NE generálj beszélgetős választ, CSAK adatot rögzíts
+- Egy helyszín CSAK EGYSZER szerepelhet
+- Egy személy CSAK EGYSZER szerepelhet
+- ESEMÉNYEK FRISSÍTÉSE: Ha a felhasználó pontosít egy korábbi eseményt (pl. megadja a dátumot), NE hozz létre új eseményt — használd PONTOSAN UGYANAZT a title-t
+- Ha nincs új tény az üzenetben (pl. csak üdvözlés, kérdés, köszönés), adj vissza üres listákat
+
+${titlesStr}
+
+Utolsó beszélgetés kontextus:
+${contextMessages}
+
+Válaszod KIZÁRÓLAG az alábbi JSON formátumban (semmi más szöveg!):
+{
+  "categories": ["childhood", "family"],
+  "events": [{"title":"...", "narrative_text":"...", "description":"...", "time_type":"exact_date|estimated_year|life_phase|uncertain", "exact_date":"...", "estimated_year":null, "life_phase":"...", "uncertain_time":"...", "category":"...", "is_turning_point":false}],
+  "persons": [{"name":"...", "relationship_type":"...", "related_period":"...", "notes":"..."}],
+  "locations": [{"name":"...", "type":"...", "related_period":"...", "notes":"..."}],
+  "emotions": [{"event_id":null, "feeling":"...", "valence":"positive|negative|mixed|neutral", "importance":3, "long_term_impact":"..."}]
+}
+
+Ha nincs új adat: {"categories":[], "events":[], "persons":[], "locations":[], "emotions":[]}`
+}
+
+// ========== INTERVIEWER AGENT ==========
+
+function buildInterviewerPrompt(
+  request: ChatRequest,
+  filteredEventSummaries: string
+): string {
   const modeInstruction = MODE_INSTRUCTIONS[request.mode] || MODE_INSTRUCTIONS.free
   const goalText = request.goal && request.goal !== 'free'
     ? `A felhasználó most a következő témára szeretne fókuszálni: ${GOAL_LABELS[request.goal] || request.goal}.`
@@ -50,8 +121,8 @@ function buildSystemPrompt(request: ChatRequest): string {
     ? `\n\nNyitott kérdések, amelyekre még nem kaptál választ:\n${request.openQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}`
     : ''
 
-  const lifeStoryContext = request.lifeStory
-    ? `\n\nAz eddig összegyűjtött életút:\n${request.lifeStory.slice(0, 3000)}`
+  const contextText = filteredEventSummaries
+    ? `\n\nAz alábbi életút-elemek vonatkoznak a jelenlegi témára:\n${filteredEventSummaries}`
     : '\n\nAz életút még üres — ez az első beszélgetés.'
 
   return `Te egy empatikus, türelmes és figyelmes magyar nyelvű életút-riporter vagy az "Életút AI" alkalmazásban. A feladatod, hogy segíts a felhasználónak felépíteni és megőrizni az élettörténetét beszélgetésen keresztül.
@@ -69,35 +140,18 @@ VISELKEDÉSI SZABÁLYOK:
 
 BESZÉLGETÉSI MÓD: ${modeInstruction}
 ${goalText}
-${lifeStoryContext}
+${contextText}
 ${openQuestionsText}
 
 A válaszod KIZÁRÓLAG az alábbi JSON formátumban add vissza, semmi mást ne írj:
 {
   "message": "A válaszod és kérdésed a felhasználónak (természetes, beszélgetős stílus)",
-  "lifeStoryUpdate": "A TELJES, FRISSÍTETT életút összefoglaló szövege. Ez TARTALMAZZA az összes korábbi tényt + az újonnan megtudottakat, egységes, tömör formában. Ha a felhasználó pontosított egy korábbi adatot, a régi verziót CSERÉLD KI az újra. null ha nincs új info.",
-  "extractedEntities": {
-    "persons": [{"name": "...", "relationship_type": "...", "related_period": "...", "notes": "..."}],
-    "events": [{"title": "...", "description": "...", "time_type": "exact_date|estimated_year|life_phase|uncertain", "exact_date": "...", "estimated_year": null, "life_phase": "...", "uncertain_time": "...", "category": "...", "is_turning_point": false}],
-    "locations": [{"name": "...", "type": "...", "related_period": "..."}],
-    "timePeriods": [{"label": "...", "start_type": "exact|estimated|uncertain", "start_value": "...", "end_type": "exact|estimated|uncertain|ongoing", "end_value": "...", "category": "..."}],
-    "emotions": [{"event_id": null, "feeling": "...", "valence": "positive|negative|mixed|neutral", "importance": 3, "long_term_impact": "..."}]
-  },
   "suggestions": ["max 8 szavas javaslat 1", "javaslat 2", "javaslat 3"],
   "openQuestions": [{"question_type": "incomplete_topic|unresolved_event|unclear_time|missing_detail|follow_up", "description": "...", "priority": 3, "status": "open"}]
+}`
 }
 
-FONTOS:
-- Az extractedEntities-ben CSAK a felhasználó által mondott tényeket rögzítsd, ne az AI kérdéseit
-- Ha nincs új entitás, az extractedEntities legyen null
-- A suggestions 3 rövid, változatos témájú folytatási javaslat legyen (max 8 szó)
-- Az openQuestions-ben frissítsd a nyitott kérdések listáját (új kérdések, lezárt kérdések)
-- A lifeStoryUpdate a TELJES életút szövegét tartalmazza, nem csak az újat! Vedd az eddigi szöveget, és FRISSÍTSD/EGÉSZÍTSD KI az új tényekkel. Ha egy adat pontosodott (pl. dátum, helyszín), CSERÉLD KI a régit az újra — ne hagyd benne mindkettőt!
-- HELYSZÍNEK: Egy helyszín CSAK EGYSZER szerepelhet a locations listában, ne add hozzá többször különböző típusokkal
-- SZEMÉLYEK: Egy személy CSAK EGYSZER szerepelhet a persons listában, még ha több szerepe is volt
-- ESEMÉNYEK FRISSÍTÉSE: Ha a felhasználó pontosít egy korábbi eseményt (pl. megadja a dátumot), NE hozz létre új eseményt — használd PONTOSAN UGYANAZT a title-t mint az eredeti, és add meg a frissített mezőket (pl. time_type, exact_date, estimated_year). Az upsert a title alapján frissít!
-- CSAK VALÓBAN ÚJ entitásokat adj hozzá - ha egy helyszín/személy/esemény már szerepel, csak frissítés esetén add újra (ugyanazzal a névvel/title-lel)`
-}
+// ========== AI CALL FUNCTIONS ==========
 
 function isClaudeModel(model: string): boolean {
   return model.startsWith('claude-')
@@ -137,11 +191,7 @@ async function callOpenAI(model: string, systemPrompt: string, messages: { role:
   if (!response.ok) {
     const errorText = await response.text()
     console.error(`[OpenAI] API error ${response.status}:`, errorText)
-    return {
-      success: false,
-      error: `OpenAI API hiba (${response.status})`,
-      details: errorText,
-    }
+    return { success: false, error: `OpenAI API hiba (${response.status})`, details: errorText }
   }
 
   const data = await response.json()
@@ -174,17 +224,100 @@ async function callAnthropic(model: string, systemPrompt: string, messages: { ro
   if (!response.ok) {
     const errorText = await response.text()
     console.error(`[Anthropic] API error ${response.status}:`, errorText)
-    return {
-      success: false,
-      error: `Anthropic API hiba (${response.status})`,
-      details: errorText,
-    }
+    return { success: false, error: `Anthropic API hiba (${response.status})`, details: errorText }
   }
 
   const data = await response.json()
   console.log(`[Anthropic] Success. Usage:`, JSON.stringify(data.usage))
   return { success: true, content: data.content[0].text }
 }
+
+async function callAI(model: string, systemPrompt: string, messages: { role: string; content: string }[], jsonMode = true) {
+  return isClaudeModel(model)
+    ? await callAnthropic(model, systemPrompt, messages)
+    : await callOpenAI(model, systemPrompt, messages, jsonMode)
+}
+
+function parseAIJSON(raw: string | undefined): Record<string, unknown> | null {
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    // Try extracting JSON from markdown wrapper
+    const jsonMatch = raw.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0])
+      } catch {
+        return null
+      }
+    }
+    return null
+  }
+}
+
+// ========== DB HELPER: fetch existing events for context ==========
+
+async function fetchExistingEvents(userId: string): Promise<{ id: string; title: string; category: string; narrative_text: string | null; is_turning_point: boolean; exact_date: string | null; estimated_year: number | null; life_phase: string | null }[]> {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn('[DB] No Supabase credentials for DB queries')
+    return []
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  const { data, error } = await supabase
+    .from('events')
+    .select('id, title, category, narrative_text, is_turning_point, exact_date, estimated_year, life_phase')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    console.error('[DB] Error fetching events:', error.message)
+    return []
+  }
+  return data || []
+}
+
+// ========== FILTER EVENTS FOR INTERVIEWER ==========
+
+function filterEventsForInterviewer(
+  events: { title: string; category: string; narrative_text: string | null; is_turning_point: boolean }[],
+  mode: string,
+  goal: string | null
+): string {
+  let filtered = events
+
+  // Determine which categories to include
+  const goalCategories = goal && goal !== 'free' ? GOAL_CATEGORY_MAP[goal] : null
+  const modeCategories = MODE_CATEGORY_MAP[mode] || null
+
+  if (goal === 'turning_points') {
+    // Special case: only turning points
+    filtered = events.filter(e => e.is_turning_point)
+  } else if (goalCategories && goalCategories.length > 0) {
+    filtered = events.filter(e => goalCategories.includes(e.category))
+  } else if (modeCategories && modeCategories.length > 0) {
+    filtered = events.filter(e => modeCategories.includes(e.category))
+  } else {
+    // Free mode: last 15 events
+    filtered = events.slice(-15)
+  }
+
+  // Fallback: if filtered is empty, take last 10
+  if (filtered.length === 0 && events.length > 0) {
+    filtered = events.slice(-10)
+  }
+
+  // Build summary string (max ~2000 chars)
+  const summaries = filtered.map(e => {
+    const text = e.narrative_text || e.title
+    return `- ${e.title}: ${text.slice(0, 150)}`
+  })
+
+  return summaries.join('\n').slice(0, 2000)
+}
+
+// ========== MAIN HANDLER ==========
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -209,86 +342,116 @@ Deno.serve(async (req) => {
         ? await callAnthropic(model, testSystemPrompt, testMessages)
         : await callOpenAI(model, testSystemPrompt, testMessages, false)
 
-      if (result.success) {
-        return new Response(JSON.stringify({
-          test: true,
-          success: true,
-          model,
-          provider: isClaude ? 'Anthropic' : 'OpenAI',
-          response: result.content,
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      } else {
-        return new Response(JSON.stringify({
-          test: true,
-          success: false,
-          model,
-          provider: isClaude ? 'Anthropic' : 'OpenAI',
-          error: result.error,
-          details: result.details,
-        }), {
-          status: 200, // Return 200 so frontend can read the error details
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
+      return new Response(JSON.stringify({
+        test: true,
+        success: result.success,
+        model,
+        provider: isClaude ? 'Anthropic' : 'OpenAI',
+        ...(result.success ? { response: result.content } : { error: result.error, details: result.details }),
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    // === NORMAL CHAT MODE ===
-    const systemPrompt = buildSystemPrompt(request)
+    // === NORMAL CHAT MODE: DUAL AGENT ===
     const chatMessages = request.messages.map(m => ({ role: m.role, content: m.content }))
+    const userId = request.userId || ''
 
-    const result = isClaude
-      ? await callAnthropic(model, systemPrompt, chatMessages)
-      : await callOpenAI(model, systemPrompt, chatMessages)
-
-    if (!result.success) {
-      console.error(`[Edge Function] AI call failed:`, result.error, result.details)
-      return new Response(
-        JSON.stringify({
-          error: result.error,
-          details: result.details,
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      )
+    // Fetch existing events from DB for context
+    let existingEvents: Awaited<ReturnType<typeof fetchExistingEvents>> = []
+    if (userId) {
+      existingEvents = await fetchExistingEvents(userId)
     }
 
-    let parsed
-    try {
-      parsed = JSON.parse(result.content!)
-    } catch {
-      console.warn(`[Edge Function] Could not parse AI response as JSON, using raw text. Raw:`, result.content?.slice(0, 200))
-      // Try to extract JSON from the response (Claude sometimes wraps it in markdown)
-      const jsonMatch = result.content?.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        try {
-          parsed = JSON.parse(jsonMatch[0])
-        } catch {
-          parsed = {
-            message: result.content,
-            lifeStoryUpdate: null,
-            extractedEntities: null,
-            suggestions: [],
-            openQuestions: [],
-          }
-        }
+    const existingTitles = existingEvents.map(e => e.title)
+
+    // Build prompts
+    const recorderPrompt = buildRecorderPrompt(existingTitles, chatMessages)
+    const recorderMessages = chatMessages.slice(-5) // last 5 messages for recorder
+
+    const filteredSummaries = filterEventsForInterviewer(existingEvents, request.mode, request.goal)
+    const interviewerPrompt = buildInterviewerPrompt(request, filteredSummaries)
+    const interviewerMessages = chatMessages.slice(-10) // last 10 messages for interviewer
+
+    console.log(`[Edge Function] Launching parallel agents. Recorder context: ${existingTitles.length} existing events. Interviewer context: ${filteredSummaries.length} chars.`)
+
+    // Run both agents in parallel
+    const [recorderResult, interviewerResult] = await Promise.all([
+      callAI(model, recorderPrompt, recorderMessages),
+      callAI(model, interviewerPrompt, interviewerMessages),
+    ])
+
+    // Parse Recorder output
+    let recorderData: Record<string, unknown> = {
+      categories: [],
+      events: [],
+      persons: [],
+      locations: [],
+      emotions: [],
+    }
+    if (recorderResult.success) {
+      const parsed = parseAIJSON(recorderResult.content)
+      if (parsed) {
+        recorderData = parsed
+        console.log(`[Recorder] Extracted: ${(recorderData.events as unknown[])?.length || 0} events, ${(recorderData.persons as unknown[])?.length || 0} persons, ${(recorderData.locations as unknown[])?.length || 0} locations`)
       } else {
-        parsed = {
-          message: result.content,
-          lifeStoryUpdate: null,
-          extractedEntities: null,
-          suggestions: [],
-          openQuestions: [],
-        }
+        console.warn('[Recorder] Could not parse JSON response:', recorderResult.content?.slice(0, 200))
       }
+    } else {
+      console.error('[Recorder] AI call failed:', recorderResult.error)
     }
 
-    console.log(`[Edge Function] Response parsed successfully. Has message: ${!!parsed.message}`)
+    // Parse Interviewer output
+    let interviewerData: { message: string; suggestions: string[]; openQuestions: Record<string, unknown>[] } = {
+      message: '',
+      suggestions: [],
+      openQuestions: [],
+    }
+    if (interviewerResult.success) {
+      const parsed = parseAIJSON(interviewerResult.content)
+      if (parsed && parsed.message) {
+        interviewerData = {
+          message: parsed.message as string,
+          suggestions: (parsed.suggestions as string[]) || [],
+          openQuestions: (parsed.openQuestions as Record<string, unknown>[]) || [],
+        }
+        console.log(`[Interviewer] Message length: ${interviewerData.message.length}, Suggestions: ${interviewerData.suggestions.length}`)
+      } else {
+        // Fallback: use raw text as message
+        interviewerData.message = interviewerResult.content || 'Elnézést, nem sikerült válaszolnom. Kérlek, próbáld újra!'
+        console.warn('[Interviewer] Could not parse JSON, using raw text')
+      }
+    } else {
+      console.error('[Interviewer] AI call failed:', interviewerResult.error)
+      // If interviewer fails but recorder succeeded, return a generic message
+      interviewerData.message = 'Elnézést, technikai hiba történt a válasz generálásakor. Kérlek, próbáld újra!'
+    }
 
-    return new Response(JSON.stringify(parsed), {
+    // Combine results
+    const hasEntities =
+      ((recorderData.events as unknown[])?.length || 0) > 0 ||
+      ((recorderData.persons as unknown[])?.length || 0) > 0 ||
+      ((recorderData.locations as unknown[])?.length || 0) > 0 ||
+      ((recorderData.emotions as unknown[])?.length || 0) > 0
+
+    const response = {
+      message: interviewerData.message,
+      messageTags: (recorderData.categories as string[]) || [],
+      extractedEntities: hasEntities ? {
+        persons: (recorderData.persons as Record<string, unknown>[]) || [],
+        events: (recorderData.events as Record<string, unknown>[]) || [],
+        locations: (recorderData.locations as Record<string, unknown>[]) || [],
+        timePeriods: [],
+        emotions: (recorderData.emotions as Record<string, unknown>[]) || [],
+      } : null,
+      suggestions: interviewerData.suggestions,
+      openQuestions: interviewerData.openQuestions,
+    }
+
+    console.log(`[Edge Function] Combined response. Message: ${!!response.message}, Entities: ${hasEntities}, Tags: ${response.messageTags.length}`)
+
+    return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
