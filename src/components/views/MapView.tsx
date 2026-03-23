@@ -1,151 +1,187 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, MapPin, Search, Loader2 } from 'lucide-react'
+import { ArrowLeft, MapPin, Search, Loader2, Check, X, Navigation, ChevronDown, ChevronUp, Edit2 } from 'lucide-react'
 import type { Location } from '@/types'
 
-// Fix Leaflet default marker icon issue with bundlers (Vite/Webpack)
+// Fix Leaflet default icon issue with bundlers
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-})
+L.Icon.Default.mergeOptions({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow })
 
-// Color-coded marker icons by location type
-const MARKER_COLORS: Record<string, string> = {
-  city: '#3b82f6',        // blue
-  town: '#6366f1',        // indigo
-  village: '#8b5cf6',     // violet
-  school: '#a855f7',      // purple
-  workplace: '#22c55e',   // green
-  home: '#f59e0b',        // amber
-  hospital: '#ef4444',    // red
-  church: '#ec4899',      // pink
-  country: '#14b8a6',     // teal
+// ── Icons ──────────────────────────────────────────────────────────────────
+
+const TYPE_COLORS: Record<string, string> = {
+  city: '#3b82f6', town: '#6366f1', village: '#8b5cf6',
+  school: '#a855f7', workplace: '#22c55e', home: '#f59e0b',
+  hospital: '#ef4444', church: '#ec4899', country: '#14b8a6',
 }
 
-function createColoredIcon(type: string) {
-  const color = MARKER_COLORS[type?.toLowerCase()] || '#3b82f6'
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
-    <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="${color}" stroke="white" stroke-width="1.5"/>
-    <circle cx="12" cy="12" r="5" fill="white" opacity="0.9"/>
+function pinSvg(fill: string, inner: string) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
+    <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="${fill}" stroke="white" stroke-width="1.5"/>
+    ${inner}
   </svg>`
+}
+
+function confirmedIcon(type: string) {
+  const color = TYPE_COLORS[type?.toLowerCase()] || '#3b82f6'
   return L.divIcon({
-    html: svg,
-    iconSize: [24, 36],
-    iconAnchor: [12, 36],
-    popupAnchor: [0, -36],
-    className: '',
+    html: pinSvg(color, `<circle cx="12" cy="12" r="5" fill="white" opacity="0.9"/>`),
+    iconSize: [24, 36], iconAnchor: [12, 36], popupAnchor: [0, -36], className: '',
   })
 }
 
-// Hungary center
-const HUNGARY_CENTER: L.LatLngExpression = [47.1625, 19.5033]
-const DEFAULT_ZOOM = 7
-
-interface MapViewProps {
-  onBack: () => void
+function pendingIcon() {
+  return L.divIcon({
+    html: pinSvg('#f97316', `<circle cx="12" cy="12" r="5" fill="white" opacity="0.9"/>
+      <text x="12" y="16" text-anchor="middle" font-size="9" fill="#f97316" font-weight="bold">?</text>`),
+    iconSize: [24, 36], iconAnchor: [12, 36], popupAnchor: [0, -36], className: 'pending-marker',
+  })
 }
 
-/** Auto-fit map bounds to markers */
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+const HUNGARY_CENTER: L.LatLngExpression = [47.1625, 19.5033]
+
+function isConfirmed(loc: Location) {
+  return loc.coordinates_confirmed === true
+}
+
+function parseGPS(input: string): { lat: number; lng: number } | null {
+  // Google Maps URL: contains @lat,lng,zoom
+  const googleMatch = input.match(/@(-?\d+\.?\d+),(-?\d+\.?\d+)/)
+  if (googleMatch) return { lat: parseFloat(googleMatch[1]), lng: parseFloat(googleMatch[2]) }
+  // "lat, lng" or "lat lng" or "lat,lng"
+  const plainMatch = input.trim().match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/)
+  if (plainMatch) return { lat: parseFloat(plainMatch[1]), lng: parseFloat(plainMatch[2]) }
+  return null
+}
+
+// ── FlyTo helper (must be inside MapContainer) ─────────────────────────────
+
+function FlyTo({ target }: { target: { lat: number; lng: number } | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (target) map.flyTo([target.lat, target.lng], Math.max(map.getZoom(), 13))
+  }, [target, map])
+  return null
+}
+
 function FitBounds({ locations }: { locations: Location[] }) {
   const map = useMap()
-
   useEffect(() => {
     const coords = locations
       .filter(l => l.coordinates)
       .map(l => [l.coordinates!.lat, l.coordinates!.lng] as L.LatLngTuple)
-
     if (coords.length > 0) {
-      const bounds = L.latLngBounds(coords)
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 })
+      map.fitBounds(L.latLngBounds(coords), { padding: [60, 60], maxZoom: 13 })
     }
-  }, [locations, map])
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // only on mount
   return null
 }
 
-/** Location list item with geocoding button */
-function LocationListItem({ location }: { location: Location }) {
-  const { geocodeLocation } = useLifeStoryStore()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+// ── Main component ─────────────────────────────────────────────────────────
 
-  const handleGeocode = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      await geocodeLocation(location.id)
-    } catch {
-      setError('Nem talalhato')
-    } finally {
-      setLoading(false)
+interface MapViewProps { onBack: () => void }
+
+export function MapView({ onBack }: MapViewProps) {
+  const { locations, geocodeLocation, confirmLocation, updateLocationCoordinates } = useLifeStoryStore()
+
+  // Selected location panel
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [gpsInput, setGpsInput] = useState('')
+  const [gpsError, setGpsError] = useState('')
+  const [showGpsInput, setShowGpsInput] = useState(false)
+  const [flyTarget, setFlyTarget] = useState<{ lat: number; lng: number } | null>(null)
+
+  // Bottom panel (no-coords locations)
+  const [bottomOpen, setBottomOpen] = useState(true)
+  const [geocodingId, setGeocodingId] = useState<string | null>(null)
+  const [geocodeError, setGeocodeError] = useState<Record<string, string>>({})
+  // Inline GPS for bottom panel
+  const [bottomGpsId, setBottomGpsId] = useState<string | null>(null)
+  const [bottomGpsValue, setBottomGpsValue] = useState('')
+  const [bottomGpsError, setBottomGpsError] = useState('')
+
+  const locationsWithCoords = useMemo(() => locations.filter(l => l.coordinates), [locations])
+  const locationsWithoutCoords = useMemo(() => locations.filter(l => !l.coordinates), [locations])
+  const confirmedCount = useMemo(() => locationsWithCoords.filter(isConfirmed).length, [locationsWithCoords])
+  const pendingCount = useMemo(() => locationsWithCoords.filter(l => !isConfirmed(l)).length, [locationsWithCoords])
+
+  const selectedLocation = selectedId ? locations.find(l => l.id === selectedId) ?? null : null
+
+  const handleMarkerClick = (loc: Location) => {
+    setSelectedId(loc.id)
+    setGpsInput('')
+    setGpsError('')
+    setShowGpsInput(false)
+    setFlyTarget(loc.coordinates!)
+  }
+
+  const handleDragEnd = async (locId: string, e: L.DragEndEvent) => {
+    const { lat, lng } = (e.target as L.Marker).getLatLng()
+    await updateLocationCoordinates(locId, { lat, lng })
+    // If this is the selected one, update flyTarget so panel shows fresh coords
+    if (locId === selectedId) {
+      setFlyTarget({ lat, lng })
     }
   }
 
-  return (
-    <div className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-primary shrink-0" />
-          <span className="font-medium text-sm truncate">{location.name}</span>
-          {location.type && (
-            <Badge variant="secondary" className="text-[10px] shrink-0">
-              {location.type}
-            </Badge>
-          )}
-        </div>
-        {location.related_period && (
-          <p className="text-xs text-muted-foreground mt-0.5 ml-6">{location.related_period}</p>
-        )}
-        {location.notes && (
-          <p className="text-xs text-muted-foreground mt-0.5 ml-6 line-clamp-1">{location.notes}</p>
-        )}
-        {error && <p className="text-xs text-destructive mt-0.5 ml-6">{error}</p>}
-      </div>
-      <Button
-        variant="outline"
-        size="sm"
-        className="ml-2 shrink-0"
-        onClick={handleGeocode}
-        disabled={loading}
-      >
-        {loading ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : (
-          <>
-            <Search className="w-3.5 h-3.5 mr-1" />
-            <span className="text-xs">Helyszin keresese</span>
-          </>
-        )}
-      </Button>
-    </div>
-  )
-}
+  const handleConfirm = async () => {
+    if (!selectedLocation?.coordinates) return
+    await confirmLocation(selectedLocation.id)
+  }
 
-export function MapView({ onBack }: MapViewProps) {
-  const { locations } = useLifeStoryStore()
+  const handleEditConfirmed = async () => {
+    if (!selectedLocation) return
+    await updateLocationCoordinates(selectedLocation.id, selectedLocation.coordinates!)
+    // coordinates_confirmed becomes false via store → marker turns orange
+  }
 
-  const locationsWithCoords = useMemo(
-    () => locations.filter(l => l.coordinates),
-    [locations]
-  )
+  const handleGpsApply = async () => {
+    setGpsError('')
+    const coords = parseGPS(gpsInput)
+    if (!coords) { setGpsError('Érvénytelen formátum. Pl: 47.1234, 19.5678'); return }
+    if (!selectedLocation) return
+    await updateLocationCoordinates(selectedLocation.id, coords)
+    setFlyTarget(coords)
+    setShowGpsInput(false)
+    setGpsInput('')
+  }
 
-  const locationsWithoutCoords = useMemo(
-    () => locations.filter(l => !l.coordinates),
-    [locations]
-  )
+  const handleGeocode = async (loc: Location) => {
+    setGeocodingId(loc.id)
+    setGeocodeError(prev => ({ ...prev, [loc.id]: '' }))
+    try {
+      await geocodeLocation(loc.id)
+      // After geocoding, fly to the new coords
+      const updated = locations.find(l => l.id === loc.id)
+      if (updated?.coordinates) setFlyTarget(updated.coordinates)
+    } catch {
+      setGeocodeError(prev => ({ ...prev, [loc.id]: 'Nem található' }))
+    } finally {
+      setGeocodingId(null)
+    }
+  }
 
-  const hasAnyCoords = locationsWithCoords.length > 0
+  const handleBottomGpsApply = async (loc: Location) => {
+    setBottomGpsError('')
+    const coords = parseGPS(bottomGpsValue)
+    if (!coords) { setBottomGpsError('Érvénytelen formátum. Pl: 47.1234, 19.5678'); return }
+    await updateLocationCoordinates(loc.id, coords)
+    setFlyTarget(coords)
+    setBottomGpsId(null)
+    setBottomGpsValue('')
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -154,90 +190,262 @@ export function MapView({ onBack }: MapViewProps) {
         <Button variant="ghost" size="icon" onClick={onBack}>
           <ArrowLeft className="w-4 h-4" />
         </Button>
-        <h2 className="font-semibold">Terkep</h2>
-        <Badge variant="secondary" className="text-xs">
-          {locations.length} helyszin
-        </Badge>
+        <h2 className="font-semibold">Térkép</h2>
+        {confirmedCount > 0 && (
+          <Badge variant="secondary" className="text-xs gap-1">
+            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+            {confirmedCount} elfogadott
+          </Badge>
+        )}
+        {pendingCount > 0 && (
+          <Badge variant="outline" className="text-xs gap-1 border-orange-400 text-orange-600">
+            <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />
+            {pendingCount} jóváhagyásra vár
+          </Badge>
+        )}
       </div>
 
       {locations.length === 0 ? (
-        /* Empty state */
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center py-20 text-muted-foreground">
             <MapPin className="w-12 h-12 mx-auto mb-4 opacity-40" />
-            <p className="text-lg font-medium mb-2">A terkeped meg ures</p>
-            <p className="text-sm">
-              Kezdj el beszelgetni az AI-val, es a helyszinek automatikusan megjelennek itt!
-            </p>
+            <p className="text-lg font-medium mb-2">A térképed még üres</p>
+            <p className="text-sm">Mesélj az AI-nak és a helyszínek automatikusan megjelennek!</p>
           </div>
-        </div>
-      ) : hasAnyCoords ? (
-        /* Map + optional list of ungeocoded locations */
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 relative">
-            <MapContainer
-              center={HUNGARY_CENTER}
-              zoom={DEFAULT_ZOOM}
-              className="h-full w-full z-0"
-              style={{ minHeight: '300px' }}
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              <FitBounds locations={locationsWithCoords} />
-              {locationsWithCoords.map(location => (
-                <Marker
-                  key={location.id}
-                  position={[location.coordinates!.lat, location.coordinates!.lng]}
-                  icon={createColoredIcon(location.type)}
-                >
-                  <Popup>
-                    <div className="min-w-[160px]">
-                      <p className="font-semibold text-sm">{location.name}</p>
-                      {location.type && (
-                        <p className="text-xs text-gray-500 mt-0.5">{location.type}</p>
-                      )}
-                      {location.related_period && (
-                        <p className="text-xs text-gray-600 mt-1">
-                          <span className="font-medium">Idoszak:</span> {location.related_period}
-                        </p>
-                      )}
-                      {location.notes && (
-                        <p className="text-xs text-gray-600 mt-1">{location.notes}</p>
-                      )}
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
-            </MapContainer>
-          </div>
-
-          {/* Ungeocoded locations list below map */}
-          {locationsWithoutCoords.length > 0 && (
-            <div className="border-t px-4 py-3 max-h-[40%] overflow-y-auto shrink-0">
-              <p className="text-xs text-muted-foreground font-medium mb-2">
-                Koordinatak nelkuli helyszinek ({locationsWithoutCoords.length})
-              </p>
-              <div className="space-y-2">
-                {locationsWithoutCoords.map(location => (
-                  <LocationListItem key={location.id} location={location} />
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       ) : (
-        /* All locations lack coordinates - show list only */
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          <p className="text-sm text-muted-foreground mb-3">
-            Egyik helyszinnek sincs meg koordinataja. Keresd meg oket a gombbal!
-          </p>
-          <div className="space-y-2">
-            {locationsWithoutCoords.map(location => (
-              <LocationListItem key={location.id} location={location} />
-            ))}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Map area */}
+          <div className="flex-1 relative overflow-hidden">
+            {locationsWithCoords.length > 0 ? (
+              <MapContainer
+                center={HUNGARY_CENTER}
+                zoom={7}
+                className="absolute inset-0 z-0"
+                style={{ width: '100%', height: '100%' }}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <FitBounds locations={locationsWithCoords} />
+                <FlyTo target={flyTarget} />
+
+                {locationsWithCoords.map(loc => (
+                  <Marker
+                    key={loc.id}
+                    position={[loc.coordinates!.lat, loc.coordinates!.lng]}
+                    icon={isConfirmed(loc) ? confirmedIcon(loc.type) : pendingIcon()}
+                    draggable={!isConfirmed(loc)}
+                    eventHandlers={{
+                      click: () => handleMarkerClick(loc),
+                      dragend: (e) => handleDragEnd(loc.id, e as unknown as L.DragEndEvent),
+                    }}
+                  />
+                ))}
+              </MapContainer>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/30">
+                <p className="text-sm text-muted-foreground">Még nincs koordinátával rendelkező helyszín.</p>
+              </div>
+            )}
+
+            {/* Floating location panel */}
+            {selectedLocation && (
+              <div className="absolute top-3 right-3 w-72 bg-background border rounded-xl shadow-xl z-[1000] p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ background: isConfirmed(selectedLocation) ? (TYPE_COLORS[selectedLocation.type] || '#3b82f6') : '#f97316' }}
+                      />
+                      <span className="font-semibold text-sm truncate">{selectedLocation.name}</span>
+                      {selectedLocation.type && (
+                        <Badge variant="secondary" className="text-[10px]">{selectedLocation.type}</Badge>
+                      )}
+                    </div>
+                    {selectedLocation.related_period && (
+                      <p className="text-xs text-muted-foreground mt-0.5 ml-5">{selectedLocation.related_period}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setSelectedId(null)}
+                    className="ml-2 p-1 hover:text-destructive flex-shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {selectedLocation.coordinates && (
+                  <p className="text-xs text-muted-foreground font-mono mb-3 ml-5">
+                    {selectedLocation.coordinates.lat.toFixed(5)}, {selectedLocation.coordinates.lng.toFixed(5)}
+                  </p>
+                )}
+
+                {isConfirmed(selectedLocation) ? (
+                  /* Confirmed state */
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                      <Check className="w-3.5 h-3.5" /> Elfogadott helyszín
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={handleEditConfirmed}
+                    >
+                      <Edit2 className="w-3.5 h-3.5 mr-1.5" /> Pozíció javítása
+                    </Button>
+                  </div>
+                ) : (
+                  /* Pending state */
+                  <div className="space-y-2">
+                    <p className="text-xs text-orange-600 flex items-center gap-1.5">
+                      <Navigation className="w-3.5 h-3.5" />
+                      Jóváhagyásra vár — húzd át a pontos helyre!
+                    </p>
+
+                    <Button
+                      size="sm"
+                      className="w-full text-xs bg-green-600 hover:bg-green-700 text-white"
+                      onClick={handleConfirm}
+                    >
+                      <Check className="w-3.5 h-3.5 mr-1.5" /> Elfogadás — helyes a pozíció
+                    </Button>
+
+                    <button
+                      className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 w-full text-left"
+                      onClick={() => setShowGpsInput(v => !v)}
+                    >
+                      GPS koordináta kézi megadása
+                    </button>
+
+                    {showGpsInput && (
+                      <div className="space-y-1.5">
+                        <input
+                          type="text"
+                          value={gpsInput}
+                          onChange={e => { setGpsInput(e.target.value); setGpsError('') }}
+                          placeholder="47.1234, 19.5678 vagy Google Maps link"
+                          className="w-full text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary font-mono"
+                          onKeyDown={e => e.key === 'Enter' && handleGpsApply()}
+                        />
+                        {gpsError && <p className="text-xs text-destructive">{gpsError}</p>}
+                        <Button size="sm" className="w-full text-xs" onClick={handleGpsApply}>
+                          GPS alkalmazása
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {selectedLocation.notes && (
+                  <p className="text-xs text-muted-foreground mt-2 border-t pt-2 line-clamp-2">
+                    {selectedLocation.notes}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Legend */}
+            <div className="absolute bottom-3 left-3 bg-background/90 border rounded-lg px-2.5 py-2 z-[999] text-xs space-y-1">
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-blue-500" /> Elfogadott
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-orange-400" /> Jóváhagyásra vár (húzható)
+              </div>
+            </div>
           </div>
+
+          {/* Bottom: locations without coordinates */}
+          {locationsWithoutCoords.length > 0 && (
+            <div className="border-t bg-background shrink-0" style={{ maxHeight: '40%' }}>
+              <button
+                className="w-full flex items-center justify-between px-4 py-2 hover:bg-muted/50 text-sm font-medium"
+                onClick={() => setBottomOpen(v => !v)}
+              >
+                <span className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-muted-foreground" />
+                  GPS nélküli helyszínek ({locationsWithoutCoords.length})
+                </span>
+                {bottomOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              </button>
+
+              {bottomOpen && (
+                <div className="overflow-y-auto px-3 pb-3 space-y-2" style={{ maxHeight: 'calc(40vh - 44px)' }}>
+                  {locationsWithoutCoords.map(loc => (
+                    <div key={loc.id} className="border rounded-lg p-2.5 bg-card">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <span className="text-sm font-medium truncate">{loc.name}</span>
+                          {loc.type && <Badge variant="secondary" className="text-[10px] shrink-0">{loc.type}</Badge>}
+                        </div>
+                        <div className="flex gap-1.5 shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-7 px-2"
+                            disabled={geocodingId === loc.id}
+                            onClick={() => handleGeocode(loc)}
+                          >
+                            {geocodingId === loc.id
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : <><Search className="w-3 h-3 mr-1" />Keresés</>
+                            }
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs h-7 px-2"
+                            onClick={() => {
+                              setBottomGpsId(prev => prev === loc.id ? null : loc.id)
+                              setBottomGpsValue('')
+                              setBottomGpsError('')
+                            }}
+                          >
+                            GPS
+                          </Button>
+                        </div>
+                      </div>
+                      {geocodeError[loc.id] && (
+                        <p className="text-xs text-destructive mt-1 ml-5">{geocodeError[loc.id]}</p>
+                      )}
+                      {bottomGpsId === loc.id && (
+                        <div className="mt-2 space-y-1.5">
+                          <input
+                            type="text"
+                            value={bottomGpsValue}
+                            onChange={e => { setBottomGpsValue(e.target.value); setBottomGpsError('') }}
+                            placeholder="47.1234, 19.5678 vagy Google Maps link"
+                            className="w-full text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary font-mono"
+                            onKeyDown={e => e.key === 'Enter' && handleBottomGpsApply(loc)}
+                            autoFocus
+                          />
+                          {bottomGpsError && <p className="text-xs text-destructive">{bottomGpsError}</p>}
+                          <div className="flex gap-1.5">
+                            <Button size="sm" className="flex-1 text-xs h-7" onClick={() => handleBottomGpsApply(loc)}>
+                              Alkalmaz
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs h-7"
+                              onClick={() => setBottomGpsId(null)}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

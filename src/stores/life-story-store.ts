@@ -22,6 +22,8 @@ interface LifeStoryState {
   }) => Promise<void>
   updateOpenQuestions: (questions: Partial<OpenQuestion>[]) => Promise<void>
   geocodeLocation: (locationId: string) => Promise<void>
+  confirmLocation: (locationId: string) => Promise<void>
+  updateLocationCoordinates: (locationId: string, coordinates: { lat: number; lng: number }) => Promise<void>
 }
 
 export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
@@ -160,16 +162,40 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
       const coordinates = { lat: parseFloat(lat), lng: parseFloat(lon) }
       await supabase
         .from('locations')
-        .update({ coordinates })
+        .update({ coordinates, coordinates_confirmed: false })
         .eq('id', locationId)
       set(state => ({
         locations: state.locations.map(l =>
-          l.id === locationId ? { ...l, coordinates } : l
+          l.id === locationId ? { ...l, coordinates, coordinates_confirmed: false } : l
         ),
       }))
     } else {
       throw new Error('Nem található')
     }
+  },
+
+  confirmLocation: async (locationId) => {
+    await supabase
+      .from('locations')
+      .update({ coordinates_confirmed: true })
+      .eq('id', locationId)
+    set(state => ({
+      locations: state.locations.map(l =>
+        l.id === locationId ? { ...l, coordinates_confirmed: true } : l
+      ),
+    }))
+  },
+
+  updateLocationCoordinates: async (locationId, coordinates) => {
+    await supabase
+      .from('locations')
+      .update({ coordinates, coordinates_confirmed: false })
+      .eq('id', locationId)
+    set(state => ({
+      locations: state.locations.map(l =>
+        l.id === locationId ? { ...l, coordinates, coordinates_confirmed: false } : l
+      ),
+    }))
   },
 
   updateOpenQuestions: async (questions) => {

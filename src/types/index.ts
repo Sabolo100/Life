@@ -85,6 +85,7 @@ export interface Location {
   type: string
   related_period: string | null
   coordinates: { lat: number; lng: number } | null
+  coordinates_confirmed: boolean | null
   notes: string | null
 }
 
