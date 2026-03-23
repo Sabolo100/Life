@@ -24,10 +24,8 @@ const RELATIONSHIP_CONFIG: Record<string, { tier: number; label: string; color: 
   édesapám:     { tier: 1, label: 'Apa',       color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
   testvér:      { tier: 1, label: 'Testvér',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
   fivér:        { tier: 1, label: 'Fivér',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  bátyám:       { tier: 1, label: 'Fivér',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  öcsém:        { tier: 1, label: 'Fivér',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  bátyám:       { tier: 1, label: 'Báty',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
   nővér:        { tier: 1, label: 'Nővér',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  húgom:        { tier: 1, label: 'Nővér',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
   gyerek:       { tier: 1, label: 'Gyerek',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
   gyermek:      { tier: 1, label: 'Gyermek',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
   fiam:         { tier: 1, label: 'Gyerek',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
@@ -46,10 +44,46 @@ const RELATIONSHIP_CONFIG: Record<string, { tier: number; label: string; color: 
   nagymama:     { tier: 1, label: 'Nagyanya',  color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
   unoka:        { tier: 1, label: 'Unoka',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
   rokon:        { tier: 1, label: 'Rokon',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  nagybácsi:    { tier: 1, label: 'Rokon',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  nagynéni:     { tier: 1, label: 'Rokon',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  unokaöcs:     { tier: 1, label: 'Rokon',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  unokahúg:     { tier: 1, label: 'Rokon',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  // testvérek
+  báty:         { tier: 1, label: 'Báty',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  bátya:        { tier: 1, label: 'Báty',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  öcs:          { tier: 1, label: 'Öcs',       color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  öccs:         { tier: 1, label: 'Öcs',       color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  öcsém:        { tier: 1, label: 'Öcs',       color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  húg:          { tier: 1, label: 'Húg',       color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  // nagyszülők informális
+  mama:         { tier: 1, label: 'Nagyanya',  color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  papa:         { tier: 1, label: 'Nagyapa',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  nagypapa:     { tier: 1, label: 'Nagyapa',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  tata:         { tier: 1, label: 'Apa',       color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  // dédszülők
+  dédapa:       { tier: 1, label: 'Dédapa',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  dédanya:      { tier: 1, label: 'Dédanya',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  dédmama:      { tier: 1, label: 'Dédanya',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  dédpapa:      { tier: 1, label: 'Dédapa',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  dédi:         { tier: 1, label: 'Dédszülő',  color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  ükapa:        { tier: 1, label: 'Ükapa',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  ükanya:       { tier: 1, label: 'Ükanya',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  // sógorság / após-anyós
+  sógor:        { tier: 1, label: 'Sógor',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  sógorom:      { tier: 1, label: 'Sógor',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  sógornő:      { tier: 1, label: 'Sógornő',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  sógornőm:     { tier: 1, label: 'Sógornő',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  após:         { tier: 1, label: 'Após',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  apósom:       { tier: 1, label: 'Após',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  anyós:        { tier: 1, label: 'Anyós',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  anyósom:      { tier: 1, label: 'Anyós',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  vejém:        { tier: 1, label: 'Vő',        color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  menyem:       { tier: 1, label: 'Meny',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  // egyéb rokonok
+  nagybácsi:    { tier: 1, label: 'Nagybácsi', color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  nagybátyám:   { tier: 1, label: 'Nagybácsi', color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  nagynéni:     { tier: 1, label: 'Nagynéni',  color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  nagynénim:    { tier: 1, label: 'Nagynéni',  color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  unokatestvér: { tier: 1, label: 'Unokatestvér', color: 'text-rose-700 dark:text-rose-300', bg: 'bg-rose-100 dark:bg-rose-900/40', border: 'border-rose-400', stroke: '#f43f5e' },
+  unokaöcs:     { tier: 1, label: 'Unokaöcs',  color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  unokahúg:     { tier: 1, label: 'Unokahúg',  color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  // angol
   family:       { tier: 1, label: 'Család',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
   parent:       { tier: 1, label: 'Szülő',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
   mother:       { tier: 1, label: 'Anya',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
@@ -98,8 +132,39 @@ function getRelConfig(type: string) {
   // Exact match
   if (RELATIONSHIP_CONFIG[t]) return RELATIONSHIP_CONFIG[t]
 
-  // Kulcsszó-alapú fallback (ragozott/összetett alakokra)
-  const familyKeywords = ['anya', 'apa', 'szülő', 'testvér', 'fivér', 'nővér', 'gyerek', 'gyermek', 'házastárs', 'férj', 'feleség', 'partner', 'nagyszülő', 'nagyapa', 'nagyanya', 'nagymama', 'unoka', 'rokon', 'nagybácsi', 'nagynéni', 'édesanya', 'édesapa', 'família', 'family']
+  // Kulcsszó-alapú fallback (ragozott/összetett alakokra — t.includes(k) elv)
+  // Elég a TŐ: 'anya' elkapja anyám/édesanya/nagyanya/dédanya/anyós stb.
+  const familyKeywords = [
+    // szülők
+    'anya', 'édesanya', 'apa', 'édesapa',
+    'mama', 'papa', 'tata',               // informális + nagymama/nagypapa is lefedve
+    'szülő',
+    // nagyszülők
+    'nagyanya', 'nagyapa', 'nagyszülő', 'nagymama', 'nagypapa',
+    // dédszülők
+    'déd',                                 // dédapa/dédanya/dédmama/dédpapa/dédi
+    'ük',                                  // ükapa/ükanya
+    // testvérek
+    'testvér', 'fivér', 'nővér',
+    'báty',                                // bátya/bátyám/nagybátya/nagybátyám
+    'öcs',                                 // öcsém/öccse/öcséd
+    'húg',                                 // húgom/húga/unokahúg
+    // gyerekek
+    'gyerek', 'gyermek', 'fiam', 'lányom', 'fia', 'lánya',
+    // unokák / unokatestvérek
+    'unoka',                               // unoka/unokám/unokatestvér/unokaöcs/unokahúg
+    // rokonság
+    'rokon', 'nagybácsi', 'nagynéni',
+    'sógor',                               // sógor/sógorom/sógornő/sógornőm
+    'após',                                // após/apósom
+    'anyós',                               // anyós/anyósom
+    'meny',                                // menyem/menye (vő kivétel — rövid)
+    'vőm', 'vejém',                        // pontosabb vő-re
+    // házastárs
+    'házastárs', 'férj', 'feleség', 'partner',
+    // angol/egyéb
+    'family', 'família', 'parent', 'mother', 'father', 'sibling', 'brother', 'sister', 'child', 'spouse', 'grandma', 'grandpa', 'grandmother', 'grandfather',
+  ]
   const friendKeywords = ['barát', 'barátnő', 'friend']
   const colleagueKeywords = ['kolléga', 'colleague', 'munkatárs', 'főnök', 'boss', 'beosztott']
   const teacherKeywords = ['tanár', 'tanárnő', 'teacher', 'mentor', 'osztályfőnök', 'professzor', 'edző']
