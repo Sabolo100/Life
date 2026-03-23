@@ -64,6 +64,14 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
         speakText(response.message)
       }
 
+      console.log('[ChatView] AI response:', {
+        hasEntities: !!response.extractedEntities,
+        persons: response.extractedEntities?.persons?.length || 0,
+        events: response.extractedEntities?.events?.length || 0,
+        locations: response.extractedEntities?.locations?.length || 0,
+        tags: response.messageTags,
+      })
+
       if (response.extractedEntities) {
         await upsertEntities(response.extractedEntities)
       }
