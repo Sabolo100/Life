@@ -249,12 +249,14 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
     const result: PersonPosition[] = []
     const cx = 50 // center percentage
     const cy = 50
-    const radii = [0, 22, 36, 48] // tier radii in percentage
+    // Tier ring boundaries: 0 | 22 | 36 | 48
+    // Dots placed at the midpoint of each ring area, not on the boundary
+    const tierMidRadii = [0, 13, 29, 42] // midpoints: (0+22)/2≈11+2, (22+36)/2, (36+48)/2
 
     for (let tier = 1; tier <= 3; tier++) {
       const tierPersons = tiers[tier]
       if (tierPersons.length === 0) continue
-      const r = radii[tier]
+      const r = tierMidRadii[tier]
       tierPersons.forEach((person, idx) => {
         const angle = (2 * Math.PI * idx) / tierPersons.length - Math.PI / 2
         result.push({
