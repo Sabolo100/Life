@@ -8,6 +8,7 @@ interface ChatRequest {
   aiModel?: string
   emotionalLayer?: boolean
   userId?: string
+  messageCount?: number
 }
 
 interface AIResponse {
@@ -22,6 +23,7 @@ interface AIResponse {
   } | null
   suggestions: string[]
   openQuestions: Record<string, unknown>[]
+  sessionTitle?: string | null
 }
 
 export interface AITestResult {

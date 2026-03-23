@@ -12,6 +12,7 @@ interface ChatState {
   createSession: (mode: SessionMode, goal: SessionGoal | null) => Promise<ChatSession | null>
   selectSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
+  updateSessionTitle: (sessionId: string, title: string) => Promise<void>
   addMessage: (content: string, isUser: boolean) => Promise<Message | null>
   loadMessages: (sessionId: string) => Promise<void>
   setSending: (sending: boolean) => void
@@ -69,6 +70,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
       sessions: state.sessions.filter(s => s.id !== sessionId),
       currentSession: state.currentSession?.id === sessionId ? null : state.currentSession,
       messages: state.currentSession?.id === sessionId ? [] : state.messages,
+    }))
+  },
+
+  updateSessionTitle: async (sessionId, title) => {
+    const trimmed = title.trim()
+    if (!trimmed) return
+    await supabase
+      .from('chat_sessions')
+      .update({ title: trimmed })
+      .eq('id', sessionId)
+    set(state => ({
+      sessions: state.sessions.map(s => s.id === sessionId ? { ...s, title: trimmed } : s),
+      currentSession: state.currentSession?.id === sessionId
+        ? { ...state.currentSession, title: trimmed }
+        : state.currentSession,
     }))
   },
 

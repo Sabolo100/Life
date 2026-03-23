@@ -17,7 +17,7 @@ interface ChatViewProps {
 }
 
 export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, onPendingConsumed }: ChatViewProps) {
-  const { messages, currentSession, sending, addMessage, setSending } = useChatStore()
+  const { messages, currentSession, sending, addMessage, setSending, updateSessionTitle } = useChatStore()
   const { openQuestions, upsertEntities, updateOpenQuestions } = useLifeStoryStore()
   const { topicHints, aiModel, emotionalLayer, ttsEnabled } = useSettingsStore()
   const { profile } = useAuthStore()
@@ -56,6 +56,7 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
         aiModel,
         emotionalLayer,
         userId: profile?.id,
+        messageCount: messages.length,
       })
 
       await addMessage(response.message, false)
@@ -71,6 +72,11 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
         locations: response.extractedEntities?.locations?.length || 0,
         tags: response.messageTags,
       })
+
+      // Auto-title: if AI returned a title and session still has default name
+      if (response.sessionTitle && currentSession.title === 'Új beszélgetés') {
+        await updateSessionTitle(currentSession.id, response.sessionTitle)
+      }
 
       if (response.extractedEntities) {
         await upsertEntities(response.extractedEntities)

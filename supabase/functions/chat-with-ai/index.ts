@@ -20,6 +20,7 @@ interface ChatRequest {
   emotionalLayer?: boolean
   topicHints?: boolean
   userId?: string
+  messageCount?: number
   test?: boolean
 }
 
@@ -141,6 +142,15 @@ function buildInterviewerPrompt(
     ? `\n\nAz alábbi életút-elemek vonatkoznak a jelenlegi témára:\n${filteredEventSummaries}`
     : '\n\nAz életút még üres — ez az első beszélgetés.'
 
+  const isEarlyMessage = !request.messageCount || request.messageCount <= 2
+  const titleInstruction = isEarlyMessage
+    ? `\n\nBESZÉLGETÉS CÍM: Generálj egy rövid, tömör magyar nyelvű címet (3-6 szó) ehhez a beszélgetéshez a "sessionTitle" mezőbe. A cím tükrözze a fő témát (pl. "Általános iskolai évek Parádon", "Pályakezdés és első munkahely", "Gyerekkori emlékek"). Ha még nem derül ki elég a témából, adj általános de informatív címet.`
+    : ''
+
+  const titleField = isEarlyMessage
+    ? `\n  "sessionTitle": "Rövid, leíró cím 3-6 szóban",`
+    : ''
+
   return `Te egy empatikus, türelmes és figyelmes magyar nyelvű életút-riporter vagy az "Életút AI" alkalmazásban. A feladatod, hogy segíts a felhasználónak felépíteni és megőrizni az élettörténetét beszélgetésen keresztül.
 
 VISELKEDÉSI SZABÁLYOK:
@@ -158,9 +168,10 @@ BESZÉLGETÉSI MÓD: ${modeInstruction}
 ${goalText}
 ${contextText}
 ${openQuestionsText}
+${titleInstruction}
 
 A válaszod KIZÁRÓLAG az alábbi JSON formátumban add vissza, semmi mást ne írj:
-{
+{${titleField}
   "message": "A válaszod és kérdésed a felhasználónak (természetes, beszélgetős stílus)",
   "suggestions": ["max 8 szavas javaslat 1", "javaslat 2", "javaslat 3"],
   "openQuestions": [{"question_type": "incomplete_topic|unresolved_event|unclear_time|missing_detail|follow_up", "description": "...", "priority": 3, "status": "open"}]
@@ -440,7 +451,7 @@ Deno.serve(async (req) => {
     }
 
     // Parse Interviewer output
-    let interviewerData: { message: string; suggestions: string[]; openQuestions: Record<string, unknown>[] } = {
+    let interviewerData: { message: string; suggestions: string[]; openQuestions: Record<string, unknown>[]; sessionTitle?: string } = {
       message: '',
       suggestions: [],
       openQuestions: [],
@@ -452,6 +463,7 @@ Deno.serve(async (req) => {
           message: parsed.message as string,
           suggestions: (parsed.suggestions as string[]) || [],
           openQuestions: (parsed.openQuestions as Record<string, unknown>[]) || [],
+          sessionTitle: parsed.sessionTitle as string | undefined,
         }
         console.log(`[Interviewer] Message length: ${interviewerData.message.length}, Suggestions: ${interviewerData.suggestions.length}`)
       } else {
@@ -484,6 +496,7 @@ Deno.serve(async (req) => {
       } : null,
       suggestions: interviewerData.suggestions,
       openQuestions: interviewerData.openQuestions,
+      sessionTitle: interviewerData.sessionTitle || null,
     }
 
     console.log(`[Edge Function] Combined response. Message: ${!!response.message}, Entities: ${hasEntities}, Tags: ${response.messageTags.length}`)
