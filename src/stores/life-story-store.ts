@@ -118,13 +118,13 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
     }
     if (entities.timePeriods?.length) {
       const toInsert = entities.timePeriods.map(t => ({ ...t, user_id: user.id }))
-      const { error } = await supabase.from('time_periods').upsert(toInsert as TimePeriod[], { onConflict: 'user_id,name' })
+      const { error } = await supabase.from('time_periods').upsert(toInsert as TimePeriod[], { onConflict: 'user_id,label' })
       if (error) console.error('[upsertEntities] timePeriods error:', error)
       else console.log('[upsertEntities] timePeriods upserted:', toInsert.length)
     }
     if (entities.emotions?.length) {
       const toInsert = entities.emotions.map(e => ({ ...e, user_id: user.id }))
-      const { error } = await supabase.from('emotions').upsert(toInsert as Emotion[], { onConflict: 'user_id,name' })
+      const { error } = await supabase.from('emotions').upsert(toInsert as Emotion[], { onConflict: 'user_id,feeling,event_id' })
       if (error) console.error('[upsertEntities] emotions error:', error)
       else console.log('[upsertEntities] emotions upserted:', toInsert.length)
     }
