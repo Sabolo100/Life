@@ -11,48 +11,116 @@ interface RelationshipViewProps {
 
 // Relationship type → circle tier + display config
 const RELATIONSHIP_CONFIG: Record<string, { tier: number; label: string; color: string; bg: string; border: string; stroke: string }> = {
-  // Inner circle - family
-  család:    { tier: 1, label: 'Család',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  szülő:     { tier: 1, label: 'Szülő',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  anya:      { tier: 1, label: 'Anya',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  apa:       { tier: 1, label: 'Apa',       color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  testvér:   { tier: 1, label: 'Testvér',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  gyerek:    { tier: 1, label: 'Gyerek',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  gyermek:   { tier: 1, label: 'Gyermek',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  házastárs: { tier: 1, label: 'Házastárs', color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  férj:      { tier: 1, label: 'Férj',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  feleség:   { tier: 1, label: 'Feleség',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  partner:   { tier: 1, label: 'Partner',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  nagyszülő: { tier: 1, label: 'Nagyszülő', color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  unoka:     { tier: 1, label: 'Unoka',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  rokon:     { tier: 1, label: 'Rokon',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  family:    { tier: 1, label: 'Család',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  parent:    { tier: 1, label: 'Szülő',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  sibling:   { tier: 1, label: 'Testvér',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  child:     { tier: 1, label: 'Gyerek',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
-  spouse:    { tier: 1, label: 'Házastárs', color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  // Inner circle - family (exact + ragozott alakok)
+  család:       { tier: 1, label: 'Család',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  szülő:        { tier: 1, label: 'Szülő',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  anya:         { tier: 1, label: 'Anya',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  anyám:        { tier: 1, label: 'Anya',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  édesanya:     { tier: 1, label: 'Anya',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  édesanyám:    { tier: 1, label: 'Anya',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  apa:          { tier: 1, label: 'Apa',       color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  apám:         { tier: 1, label: 'Apa',       color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  édesapa:      { tier: 1, label: 'Apa',       color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  édesapám:     { tier: 1, label: 'Apa',       color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  testvér:      { tier: 1, label: 'Testvér',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  fivér:        { tier: 1, label: 'Fivér',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  bátyám:       { tier: 1, label: 'Fivér',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  öcsém:        { tier: 1, label: 'Fivér',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  nővér:        { tier: 1, label: 'Nővér',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  húgom:        { tier: 1, label: 'Nővér',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  gyerek:       { tier: 1, label: 'Gyerek',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  gyermek:      { tier: 1, label: 'Gyermek',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  fiam:         { tier: 1, label: 'Gyerek',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  lányom:       { tier: 1, label: 'Gyerek',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  házastárs:    { tier: 1, label: 'Házastárs', color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  férj:         { tier: 1, label: 'Férj',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  férjem:       { tier: 1, label: 'Férj',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  feleség:      { tier: 1, label: 'Feleség',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  feleségem:    { tier: 1, label: 'Feleség',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  partner:      { tier: 1, label: 'Partner',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  nagyszülő:    { tier: 1, label: 'Nagyszülő', color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  nagyapa:      { tier: 1, label: 'Nagyapa',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  nagyapám:     { tier: 1, label: 'Nagyapa',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  nagyanya:     { tier: 1, label: 'Nagyanya',  color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  nagyanyám:    { tier: 1, label: 'Nagyanya',  color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  nagymama:     { tier: 1, label: 'Nagyanya',  color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  unoka:        { tier: 1, label: 'Unoka',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  rokon:        { tier: 1, label: 'Rokon',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  nagybácsi:    { tier: 1, label: 'Rokon',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  nagynéni:     { tier: 1, label: 'Rokon',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  unokaöcs:     { tier: 1, label: 'Rokon',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  unokahúg:     { tier: 1, label: 'Rokon',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  family:       { tier: 1, label: 'Család',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  parent:       { tier: 1, label: 'Szülő',     color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  mother:       { tier: 1, label: 'Anya',      color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  father:       { tier: 1, label: 'Apa',       color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  sibling:      { tier: 1, label: 'Testvér',   color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  child:        { tier: 1, label: 'Gyerek',    color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
+  spouse:       { tier: 1, label: 'Házastárs', color: 'text-rose-700 dark:text-rose-300',   bg: 'bg-rose-100 dark:bg-rose-900/40',   border: 'border-rose-400', stroke: '#f43f5e' },
   // Middle circle - friends, colleagues
-  barát:     { tier: 2, label: 'Barát',     color: 'text-blue-700 dark:text-blue-300',   bg: 'bg-blue-100 dark:bg-blue-900/40',   border: 'border-blue-400', stroke: '#3b82f6' },
-  barátnő:   { tier: 2, label: 'Barátnő',  color: 'text-blue-700 dark:text-blue-300',   bg: 'bg-blue-100 dark:bg-blue-900/40',   border: 'border-blue-400', stroke: '#3b82f6' },
-  friend:    { tier: 2, label: 'Barát',     color: 'text-blue-700 dark:text-blue-300',   bg: 'bg-blue-100 dark:bg-blue-900/40',   border: 'border-blue-400', stroke: '#3b82f6' },
-  kolléga:   { tier: 2, label: 'Kolléga',   color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-green-400', stroke: '#22c55e' },
-  colleague: { tier: 2, label: 'Kolléga',   color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-green-400', stroke: '#22c55e' },
-  tanár:     { tier: 2, label: 'Tanár',     color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-purple-400', stroke: '#a855f7' },
-  teacher:   { tier: 2, label: 'Tanár',     color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-purple-400', stroke: '#a855f7' },
-  mentor:    { tier: 2, label: 'Mentor',    color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-purple-400', stroke: '#a855f7' },
-  főnök:     { tier: 2, label: 'Főnök',     color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-green-400', stroke: '#22c55e' },
-  boss:      { tier: 2, label: 'Főnök',     color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-green-400', stroke: '#22c55e' },
+  barát:        { tier: 2, label: 'Barát',     color: 'text-blue-700 dark:text-blue-300',   bg: 'bg-blue-100 dark:bg-blue-900/40',   border: 'border-blue-400', stroke: '#3b82f6' },
+  barátnő:      { tier: 2, label: 'Barátnő',  color: 'text-blue-700 dark:text-blue-300',   bg: 'bg-blue-100 dark:bg-blue-900/40',   border: 'border-blue-400', stroke: '#3b82f6' },
+  barátom:      { tier: 2, label: 'Barát',     color: 'text-blue-700 dark:text-blue-300',   bg: 'bg-blue-100 dark:bg-blue-900/40',   border: 'border-blue-400', stroke: '#3b82f6' },
+  barátnőm:     { tier: 2, label: 'Barátnő',  color: 'text-blue-700 dark:text-blue-300',   bg: 'bg-blue-100 dark:bg-blue-900/40',   border: 'border-blue-400', stroke: '#3b82f6' },
+  friend:       { tier: 2, label: 'Barát',     color: 'text-blue-700 dark:text-blue-300',   bg: 'bg-blue-100 dark:bg-blue-900/40',   border: 'border-blue-400', stroke: '#3b82f6' },
+  kolléga:      { tier: 2, label: 'Kolléga',   color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-green-400', stroke: '#22c55e' },
+  kollégám:     { tier: 2, label: 'Kolléga',   color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-green-400', stroke: '#22c55e' },
+  colleague:    { tier: 2, label: 'Kolléga',   color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-green-400', stroke: '#22c55e' },
+  tanár:        { tier: 2, label: 'Tanár',     color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-purple-400', stroke: '#a855f7' },
+  tanárnő:      { tier: 2, label: 'Tanár',     color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-purple-400', stroke: '#a855f7' },
+  tanárom:      { tier: 2, label: 'Tanár',     color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-purple-400', stroke: '#a855f7' },
+  osztályfőnök: { tier: 2, label: 'Tanár',     color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-purple-400', stroke: '#a855f7' },
+  osztályfőnököm: { tier: 2, label: 'Tanár',   color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-purple-400', stroke: '#a855f7' },
+  teacher:      { tier: 2, label: 'Tanár',     color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-purple-400', stroke: '#a855f7' },
+  mentor:       { tier: 2, label: 'Mentor',    color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-purple-400', stroke: '#a855f7' },
+  főnök:        { tier: 2, label: 'Főnök',     color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-green-400', stroke: '#22c55e' },
+  főnököm:      { tier: 2, label: 'Főnök',     color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-green-400', stroke: '#22c55e' },
+  boss:         { tier: 2, label: 'Főnök',     color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-green-400', stroke: '#22c55e' },
+  orvos:        { tier: 2, label: 'Orvos',     color: 'text-teal-700 dark:text-teal-300',   bg: 'bg-teal-100 dark:bg-teal-900/40',   border: 'border-teal-400', stroke: '#14b8a6' },
+  orvosom:      { tier: 2, label: 'Orvos',     color: 'text-teal-700 dark:text-teal-300',   bg: 'bg-teal-100 dark:bg-teal-900/40',   border: 'border-teal-400', stroke: '#14b8a6' },
+  doctor:       { tier: 2, label: 'Orvos',     color: 'text-teal-700 dark:text-teal-300',   bg: 'bg-teal-100 dark:bg-teal-900/40',   border: 'border-teal-400', stroke: '#14b8a6' },
   // Outer circle - acquaintances
-  ismerős:   { tier: 3, label: 'Ismerős',   color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900/40', border: 'border-amber-400', stroke: '#f59e0b' },
-  szomszéd:  { tier: 3, label: 'Szomszéd',  color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900/40', border: 'border-amber-400', stroke: '#f59e0b' },
-  acquaintance: { tier: 3, label: 'Ismerős', color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900/40', border: 'border-amber-400', stroke: '#f59e0b' },
-  neighbor:  { tier: 3, label: 'Szomszéd',  color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900/40', border: 'border-amber-400', stroke: '#f59e0b' },
+  ismerős:      { tier: 3, label: 'Ismerős',   color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900/40', border: 'border-amber-400', stroke: '#f59e0b' },
+  ismerősöm:    { tier: 3, label: 'Ismerős',   color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900/40', border: 'border-amber-400', stroke: '#f59e0b' },
+  szomszéd:     { tier: 3, label: 'Szomszéd',  color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900/40', border: 'border-amber-400', stroke: '#f59e0b' },
+  szomszédom:   { tier: 3, label: 'Szomszéd',  color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900/40', border: 'border-amber-400', stroke: '#f59e0b' },
+  acquaintance: { tier: 3, label: 'Ismerős',   color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900/40', border: 'border-amber-400', stroke: '#f59e0b' },
+  neighbor:     { tier: 3, label: 'Szomszéd',  color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900/40', border: 'border-amber-400', stroke: '#f59e0b' },
 }
 
 const DEFAULT_REL = { tier: 3, label: 'Egyéb', color: 'text-gray-700 dark:text-gray-300', bg: 'bg-gray-100 dark:bg-gray-900/40', border: 'border-gray-400', stroke: '#9ca3af' }
 
+// Keyword-based fallback: ha az exact match nem talál, kulcsszavak alapján dönt
 function getRelConfig(type: string) {
-  return RELATIONSHIP_CONFIG[type?.toLowerCase()] || DEFAULT_REL
+  if (!type) return DEFAULT_REL
+  const t = type.toLowerCase().trim()
+
+  // Exact match
+  if (RELATIONSHIP_CONFIG[t]) return RELATIONSHIP_CONFIG[t]
+
+  // Kulcsszó-alapú fallback (ragozott/összetett alakokra)
+  const familyKeywords = ['anya', 'apa', 'szülő', 'testvér', 'fivér', 'nővér', 'gyerek', 'gyermek', 'házastárs', 'férj', 'feleség', 'partner', 'nagyszülő', 'nagyapa', 'nagyanya', 'nagymama', 'unoka', 'rokon', 'nagybácsi', 'nagynéni', 'édesanya', 'édesapa', 'família', 'family']
+  const friendKeywords = ['barát', 'barátnő', 'friend']
+  const colleagueKeywords = ['kolléga', 'colleague', 'munkatárs', 'főnök', 'boss', 'beosztott']
+  const teacherKeywords = ['tanár', 'tanárnő', 'teacher', 'mentor', 'osztályfőnök', 'professzor', 'edző']
+  const doctorKeywords = ['orvos', 'doctor', 'doktor', 'szakorvos']
+  const acquaintanceKeywords = ['ismerős', 'szomszéd', 'neighbor', 'acquaintance']
+
+  const ROSE = { color: 'text-rose-700 dark:text-rose-300', bg: 'bg-rose-100 dark:bg-rose-900/40', border: 'border-rose-400', stroke: '#f43f5e' }
+  const BLUE = { color: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-100 dark:bg-blue-900/40', border: 'border-blue-400', stroke: '#3b82f6' }
+  const GREEN = { color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-green-400', stroke: '#22c55e' }
+  const PURPLE = { color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-purple-400', stroke: '#a855f7' }
+  const TEAL = { color: 'text-teal-700 dark:text-teal-300', bg: 'bg-teal-100 dark:bg-teal-900/40', border: 'border-teal-400', stroke: '#14b8a6' }
+  const AMBER = { color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900/40', border: 'border-amber-400', stroke: '#f59e0b' }
+
+  if (familyKeywords.some(k => t.includes(k))) return { tier: 1, label: 'Család', ...ROSE }
+  if (friendKeywords.some(k => t.includes(k))) return { tier: 2, label: 'Barát', ...BLUE }
+  if (teacherKeywords.some(k => t.includes(k))) return { tier: 2, label: 'Tanár', ...PURPLE }
+  if (doctorKeywords.some(k => t.includes(k))) return { tier: 2, label: 'Orvos', ...TEAL }
+  if (colleagueKeywords.some(k => t.includes(k))) return { tier: 2, label: 'Kolléga', ...GREEN }
+  if (acquaintanceKeywords.some(k => t.includes(k))) return { tier: 3, label: 'Ismerős', ...AMBER }
+
+  return DEFAULT_REL
 }
 
 const TIER_LABELS = ['', 'Család', 'Barátok & Kollégák', 'Ismerősök']
