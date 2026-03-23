@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Users, X } from 'lucide-react'
+import { ArrowLeft, Users, X, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
 import type { Person, LifeEvent } from '@/types'
+import { supabase } from '@/lib/supabase'
 
 interface RelationshipViewProps {
   onBack: () => void
@@ -128,42 +129,18 @@ const DEFAULT_REL = { tier: 3, label: 'Egyéb', color: 'text-gray-700 dark:text-
 function getRelConfig(type: string) {
   if (!type) return DEFAULT_REL
   const t = type.toLowerCase().trim()
-
-  // Exact match
   if (RELATIONSHIP_CONFIG[t]) return RELATIONSHIP_CONFIG[t]
 
-  // Kulcsszó-alapú fallback (ragozott/összetett alakokra — t.includes(k) elv)
-  // Elég a TŐ: 'anya' elkapja anyám/édesanya/nagyanya/dédanya/anyós stb.
   const familyKeywords = [
-    // szülők
-    'anya', 'édesanya', 'apa', 'édesapa',
-    'mama', 'papa', 'tata',               // informális + nagymama/nagypapa is lefedve
-    'szülő',
-    // nagyszülők
-    'nagyanya', 'nagyapa', 'nagyszülő', 'nagymama', 'nagypapa',
-    // dédszülők
-    'déd',                                 // dédapa/dédanya/dédmama/dédpapa/dédi
-    'ük',                                  // ükapa/ükanya
-    // testvérek
-    'testvér', 'fivér', 'nővér',
-    'báty',                                // bátya/bátyám/nagybátya/nagybátyám
-    'öcs',                                 // öcsém/öccse/öcséd
-    'húg',                                 // húgom/húga/unokahúg
-    // gyerekek
+    'anya', 'édesanya', 'apa', 'édesapa', 'mama', 'papa', 'tata', 'szülő',
+    'nagyanya', 'nagyapa', 'nagyszülő', 'nagymama', 'nagypapa', 'déd', 'ük',
+    'testvér', 'fivér', 'nővér', 'báty', 'öcs', 'húg',
     'gyerek', 'gyermek', 'fiam', 'lányom', 'fia', 'lánya',
-    // unokák / unokatestvérek
-    'unoka',                               // unoka/unokám/unokatestvér/unokaöcs/unokahúg
-    // rokonság
-    'rokon', 'nagybácsi', 'nagynéni',
-    'sógor',                               // sógor/sógorom/sógornő/sógornőm
-    'após',                                // após/apósom
-    'anyós',                               // anyós/anyósom
-    'meny',                                // menyem/menye (vő kivétel — rövid)
-    'vőm', 'vejém',                        // pontosabb vő-re
-    // házastárs
+    'unoka', 'rokon', 'nagybácsi', 'nagynéni',
+    'sógor', 'após', 'anyós', 'meny', 'vőm', 'vejém',
     'házastárs', 'férj', 'feleség', 'partner',
-    // angol/egyéb
-    'family', 'família', 'parent', 'mother', 'father', 'sibling', 'brother', 'sister', 'child', 'spouse', 'grandma', 'grandpa', 'grandmother', 'grandfather',
+    'family', 'família', 'parent', 'mother', 'father', 'sibling',
+    'brother', 'sister', 'child', 'spouse', 'grandma', 'grandpa', 'grandmother', 'grandfather',
   ]
   const friendKeywords = ['barát', 'barátnő', 'friend']
   const colleagueKeywords = ['kolléga', 'colleague', 'munkatárs', 'főnök', 'boss', 'beosztott']
@@ -189,6 +166,12 @@ function getRelConfig(type: string) {
 }
 
 const TIER_LABELS = ['', 'Család', 'Barátok & Kollégák', 'Ismerősök']
+// Canonical relationship_type for tier moves
+const TIER_CANONICAL: Record<number, string> = { 1: 'rokon', 2: 'barát', 3: 'ismerős' }
+// Tier ring bounds in SVG units (center 50,50)
+const TIER_BOUNDS = [null, { inner: 5, outer: 21 }, { inner: 23, outer: 35 }, { inner: 37, outer: 47 }]
+// Minimum distance between dot centers before collision push
+const MIN_DOT_DIST = 8
 
 interface PersonPosition {
   person: Person
@@ -197,22 +180,122 @@ interface PersonPosition {
   config: typeof DEFAULT_REL
 }
 
-export function RelationshipView({ onBack }: RelationshipViewProps) {
-  const { persons, events } = useLifeStoryStore()
-  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
+// Deterministic jitter from person id + index so positions are stable across re-renders
+function deterministicJitter(id: string, idx: number, scale = 1): number {
+  let h = idx * 2654435761
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 2654435761)
+  return ((h >>> 0) / 0xffffffff - 0.5) * scale
+}
 
-  // Build shared-event connections between persons
+// Project (x,y) back into the annular tier area
+function projectToTier(x: number, y: number, cx: number, cy: number, innerR: number, outerR: number) {
+  const dx = x - cx
+  const dy = y - cy
+  let r = Math.sqrt(dx * dx + dy * dy)
+  if (r < 0.001) return { x: cx + (innerR + outerR) / 2, y: cy }
+  const angle = Math.atan2(dy, dx)
+  r = Math.max(innerR, Math.min(outerR, r))
+  return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) }
+}
+
+interface ContextMenuState {
+  screenX: number
+  screenY: number
+  person: Person
+  currentTier: number
+}
+
+export function RelationshipView({ onBack }: RelationshipViewProps) {
+  const { persons, events, loadAll } = useLifeStoryStore()
+  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [tierOverrides, setTierOverrides] = useState<Record<string, number>>({})
+  // Zoom / pan state
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const isPanning = useRef(false)
+  const panStart = useRef({ mouseX: 0, mouseY: 0, panX: 0, panY: 0 })
+  const svgRef = useRef<SVGSVGElement>(null)
+
+  // Close context menu on outside click
+  useEffect(() => {
+    if (!contextMenu) return
+    const close = () => setContextMenu(null)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [contextMenu])
+
+  // Wheel zoom — passive:false to allow preventDefault
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const rect = el.getBoundingClientRect()
+      const nx = (e.clientX - rect.left) / rect.width
+      const ny = (e.clientY - rect.top) / rect.height
+      const vbW = 100 / zoom
+      const vbH = 100 / zoom
+      const vbX = 50 - 50 / zoom + pan.x
+      const vbY = 50 - 50 / zoom + pan.y
+      const svgX = vbX + nx * vbW
+      const svgY = vbY + ny * vbH
+      const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12
+      const newZoom = Math.max(1, Math.min(5, zoom * factor))
+      const newVbW = 100 / newZoom
+      const newVbH = 100 / newZoom
+      const newVbX = svgX - nx * newVbW
+      const newVbY = svgY - ny * newVbH
+      const newPanX = newVbX - (50 - 50 / newZoom)
+      const newPanY = newVbY - (50 - 50 / newZoom)
+      setZoom(newZoom)
+      setPan({ x: newPanX, y: newPanY })
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [zoom, pan])
+
+  // Pan via mouse drag
+  const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (e.button !== 0) return
+    isPanning.current = true
+    panStart.current = { mouseX: e.clientX, mouseY: e.clientY, panX: pan.x, panY: pan.y }
+    e.currentTarget.style.cursor = 'grabbing'
+  }
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!isPanning.current) return
+    const rect = svgRef.current!.getBoundingClientRect()
+    const svgScale = 100 / zoom / rect.width // screen px → SVG units
+    const dx = (e.clientX - panStart.current.mouseX) * svgScale
+    const dy = (e.clientY - panStart.current.mouseY) * svgScale
+    setPan({ x: panStart.current.panX - dx, y: panStart.current.panY - dy })
+  }
+  const handleMouseUp = (e: React.MouseEvent<SVGSVGElement>) => {
+    isPanning.current = false
+    e.currentTarget.style.cursor = 'grab'
+  }
+
+  const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }) }
+
+  // Move person to target tier: update DB relationship_type
+  const movePerson = async (person: Person, targetTier: number) => {
+    const newType = TIER_CANONICAL[targetTier]
+    setTierOverrides(prev => ({ ...prev, [person.id]: targetTier }))
+    setContextMenu(null)
+    await supabase.from('persons').update({ relationship_type: newType }).eq('id', person.id)
+    await loadAll()
+    setTierOverrides(prev => { const n = { ...prev }; delete n[person.id]; return n })
+  }
+
+  // Build shared-event connections
   const sharedEventConnections = useMemo(() => {
     const connections: { from: string; to: string }[] = []
     for (const event of events) {
       const pids = event.person_ids || []
       for (let i = 0; i < pids.length; i++) {
-        for (let j = i + 1; j < pids.length; j++) {
-          connections.push({ from: pids[i], to: pids[j] })
-        }
+        for (let j = i + 1; j < pids.length; j++) connections.push({ from: pids[i], to: pids[j] })
       }
     }
-    // Also check related_event_ids overlap
     for (let i = 0; i < persons.length; i++) {
       for (let j = i + 1; j < persons.length; j++) {
         const shared = (persons[i].related_event_ids || []).filter(
@@ -230,63 +313,97 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
     return connections
   }, [persons, events])
 
-  // Get events linked to a person
-  const getLinkedEvents = (person: Person): LifeEvent[] => {
-    return events.filter(e =>
-      (e.person_ids || []).includes(person.id) ||
-      (person.related_event_ids || []).includes(e.id)
-    )
-  }
+  const getLinkedEvents = (person: Person): LifeEvent[] =>
+    events.filter(e => (e.person_ids || []).includes(person.id) || (person.related_event_ids || []).includes(e.id))
 
-  // Calculate positions for radial layout
+  // Calculate positions with collision detection
   const positions = useMemo((): PersonPosition[] => {
+    const cx = 50
+    const cy = 50
+
     const tiers: Person[][] = [[], [], [], []]
     persons.forEach(p => {
-      const cfg = getRelConfig(p.relationship_type)
-      tiers[cfg.tier].push(p)
+      const tier = tierOverrides[p.id] ?? getRelConfig(p.relationship_type).tier
+      tiers[tier].push(p)
     })
 
     const result: PersonPosition[] = []
-    const cx = 50 // center percentage
-    const cy = 50
-    // Tier ring boundaries: 0 | 22 | 36 | 48
-    // Dots placed at the midpoint of each ring area, not on the boundary
-    const tierMidRadii = [0, 13, 29, 42] // midpoints: (0+22)/2≈11+2, (22+36)/2, (36+48)/2
 
     for (let tier = 1; tier <= 3; tier++) {
       const tierPersons = tiers[tier]
       if (tierPersons.length === 0) continue
-      const r = tierMidRadii[tier]
+      const bounds = TIER_BOUNDS[tier]!
+      const midR = (bounds.inner + bounds.outer) / 2
+
       tierPersons.forEach((person, idx) => {
         const angle = (2 * Math.PI * idx) / tierPersons.length - Math.PI / 2
+        // Start at mid-radius with small deterministic jitter
+        const jR = midR + deterministicJitter(person.id, idx, (bounds.outer - bounds.inner) * 0.3)
+        const clampedR = Math.max(bounds.inner, Math.min(bounds.outer, jR))
         result.push({
           person,
-          x: cx + r * Math.cos(angle),
-          y: cy + r * Math.sin(angle),
+          x: cx + clampedR * Math.cos(angle) + deterministicJitter(person.id, idx + 1000, 0.5),
+          y: cy + clampedR * Math.sin(angle) + deterministicJitter(person.id, idx + 2000, 0.5),
           config: getRelConfig(person.relationship_type),
         })
       })
     }
+
+    // Collision detection: push apart dots that are too close (same tier only)
+    for (let iter = 0; iter < 80; iter++) {
+      let anyMoved = false
+      for (let i = 0; i < result.length; i++) {
+        for (let j = i + 1; j < result.length; j++) {
+          const tierI = tierOverrides[result[i].person.id] ?? getRelConfig(result[i].person.relationship_type).tier
+          const tierJ = tierOverrides[result[j].person.id] ?? getRelConfig(result[j].person.relationship_type).tier
+          if (tierI !== tierJ) continue // only push within same tier
+
+          const dx = result[j].x - result[i].x
+          const dy = result[j].y - result[i].y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          if (dist < MIN_DOT_DIST && dist > 0.001) {
+            const push = (MIN_DOT_DIST - dist) / 2
+            const nx = dx / dist
+            const ny = dy / dist
+            result[i].x -= nx * push
+            result[i].y -= ny * push
+            result[j].x += nx * push
+            result[j].y += ny * push
+
+            // Project back into tier bounds
+            const boundsI = TIER_BOUNDS[tierI]!
+            const projI = projectToTier(result[i].x, result[i].y, cx, cy, boundsI.inner, boundsI.outer)
+            result[i].x = projI.x; result[i].y = projI.y
+
+            const boundsJ = TIER_BOUNDS[tierJ]!
+            const projJ = projectToTier(result[j].x, result[j].y, cx, cy, boundsJ.inner, boundsJ.outer)
+            result[j].x = projJ.x; result[j].y = projJ.y
+
+            anyMoved = true
+          }
+        }
+      }
+      if (!anyMoved) break
+    }
+
     return result
-  }, [persons])
+  }, [persons, tierOverrides])
 
   // Group persons by tier for list view
   const groupedPersons = useMemo(() => {
     const groups: Record<number, Person[]> = { 1: [], 2: [], 3: [] }
     persons.forEach(p => {
-      const cfg = getRelConfig(p.relationship_type)
-      groups[cfg.tier].push(p)
+      const tier = tierOverrides[p.id] ?? getRelConfig(p.relationship_type).tier
+      groups[tier].push(p)
     })
     return groups
-  }, [persons])
+  }, [persons, tierOverrides])
 
   if (persons.length === 0) {
     return (
       <div className="h-full flex flex-col">
         <div className="flex items-center gap-2 p-4 border-b">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+          <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="w-4 h-4" /></Button>
           <h2 className="font-semibold">Kapcsolati halo</h2>
         </div>
         <div className="flex-1 flex items-center justify-center p-8">
@@ -294,8 +411,7 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
             <Users className="w-12 h-12 mx-auto text-muted-foreground/50" />
             <h3 className="text-lg font-medium text-muted-foreground">Meg nincsenek szemelyek</h3>
             <p className="text-sm text-muted-foreground/70 max-w-sm">
-              Meseld el az elettorteneteidet a chatben, es az AI automatikusan felismeri
-              es rogziti az emlitett szemelyeket.
+              Meseld el az elettorteneteidet a chatben, es az AI automatikusan felismeri es rogziti az emlitett szemelyeket.
             </p>
           </div>
         </div>
@@ -304,69 +420,72 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
   }
 
   const posMap = new Map(positions.map(p => [p.person.id, p]))
+  const vbX = 50 - 50 / zoom + pan.x
+  const vbY = 50 - 50 / zoom + pan.y
+  const vbSize = 100 / zoom
 
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-2 p-4 border-b shrink-0">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
+        <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="w-4 h-4" /></Button>
         <h2 className="font-semibold">Kapcsolati halo</h2>
         <Badge variant="secondary" className="ml-auto">{persons.length} szemely</Badge>
+        {/* Zoom controls */}
+        <div className="flex items-center gap-1 ml-2">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+            const newZoom = Math.min(5, zoom * 1.3)
+            setZoom(newZoom)
+          }}><ZoomIn className="w-3.5 h-3.5" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+            const newZoom = Math.max(1, zoom / 1.3)
+            setZoom(newZoom)
+            if (newZoom <= 1) setPan({ x: 0, y: 0 })
+          }}><ZoomOut className="w-3.5 h-3.5" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetView}><Maximize2 className="w-3.5 h-3.5" /></Button>
+        </div>
       </div>
 
       {/* Radial layout - hidden on mobile */}
       <div className="flex-1 overflow-hidden relative hidden md:block">
         <svg
+          ref={svgRef}
           className="w-full h-full"
-          viewBox="0 0 100 100"
+          viewBox={`${vbX} ${vbY} ${vbSize} ${vbSize}`}
           preserveAspectRatio="xMidYMid meet"
+          style={{ cursor: 'grab', userSelect: 'none' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
         >
           {/* Concentric circle guides */}
           <circle cx="50" cy="50" r="22" fill="none" stroke="currentColor" className="text-border" strokeWidth="0.15" strokeDasharray="1 0.5" />
           <circle cx="50" cy="50" r="36" fill="none" stroke="currentColor" className="text-border" strokeWidth="0.15" strokeDasharray="1 0.5" />
           <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" className="text-border" strokeWidth="0.15" strokeDasharray="1 0.5" />
 
-          {/* Shared event connections (subtle) */}
+          {/* Shared event connections */}
           {sharedEventConnections.map((conn, i) => {
             const a = posMap.get(conn.from)
             const b = posMap.get(conn.to)
             if (!a || !b) return null
             return (
-              <line
-                key={`shared-${i}`}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke="currentColor"
-                className="text-muted-foreground/20"
-                strokeWidth="0.2"
-                strokeDasharray="0.5 0.5"
-              />
+              <line key={`shared-${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                stroke="currentColor" className="text-muted-foreground/20"
+                strokeWidth="0.2" strokeDasharray="0.5 0.5" />
             )
           })}
 
-          {/* Connection lines from center to each person */}
+          {/* Connection lines from center */}
           {positions.map(({ person, x, y, config }) => (
-            <line
-              key={`line-${person.id}`}
-              x1={50}
-              y1={50}
-              x2={x}
-              y2={y}
-              stroke={config.stroke}
-              strokeWidth="0.25"
-              opacity={selectedPerson && selectedPerson.id !== person.id ? 0.15 : 0.5}
-            />
+            <line key={`line-${person.id}`} x1={50} y1={50} x2={x} y2={y}
+              stroke={config.stroke} strokeWidth="0.25"
+              opacity={selectedPerson && selectedPerson.id !== person.id ? 0.15 : 0.5} />
           ))}
 
-          {/* Center node - "Én" */}
+          {/* Center node */}
           <circle cx="50" cy="50" r="3.5" className="fill-primary" />
-          <text x="50" y="50.4" textAnchor="middle" dominantBaseline="middle" className="fill-primary-foreground" fontSize="2" fontWeight="bold">
-            En
-          </text>
+          <text x="50" y="50.4" textAnchor="middle" dominantBaseline="middle" className="fill-primary-foreground" fontSize="2" fontWeight="bold">En</text>
 
           {/* Person nodes */}
           {positions.map(({ person, x, y, config }) => {
@@ -375,58 +494,30 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
             return (
               <g
                 key={person.id}
-                className="cursor-pointer"
-                onClick={() => setSelectedPerson(isSelected ? null : person)}
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => { e.stopPropagation(); setSelectedPerson(isSelected ? null : person) }}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const tier = tierOverrides[person.id] ?? getRelConfig(person.relationship_type).tier
+                  setContextMenu({ screenX: e.clientX, screenY: e.clientY, person, currentTier: tier })
+                }}
                 opacity={dimmed ? 0.3 : 1}
               >
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={isSelected ? 3.2 : 2.8}
-                  fill={config.stroke}
-                  opacity={0.15}
-                  stroke={config.stroke}
-                  strokeWidth={isSelected ? 0.4 : 0.2}
-                />
-                <circle
-                  cx={x}
-                  cy={y}
-                  r="1.2"
-                  fill={config.stroke}
-                  opacity={0.8}
-                />
-                {/* Name label */}
-                <text
-                  x={x}
-                  y={y + 3}
-                  textAnchor="middle"
-                  fontSize="1.5"
-                  className="fill-foreground"
-                  fontWeight={isSelected ? 'bold' : 'normal'}
-                >
+                <circle cx={x} cy={y} r={isSelected ? 3.2 : 2.8} fill={config.stroke} opacity={0.15}
+                  stroke={config.stroke} strokeWidth={isSelected ? 0.4 : 0.2} />
+                <circle cx={x} cy={y} r="1.2" fill={config.stroke} opacity={0.8} />
+                <text x={x} y={y + 3} textAnchor="middle" fontSize="1.5" className="fill-foreground"
+                  fontWeight={isSelected ? 'bold' : 'normal'} style={{ pointerEvents: 'none' }}>
                   {person.nickname || person.name}
                 </text>
-                {/* Relationship type label */}
-                <text
-                  x={x}
-                  y={y + 4.5}
-                  textAnchor="middle"
-                  fontSize="1"
-                  fill={config.stroke}
-                  opacity={0.8}
-                >
+                <text x={x} y={y + 4.5} textAnchor="middle" fontSize="1" fill={config.stroke} opacity={0.8}
+                  style={{ pointerEvents: 'none' }}>
                   {config.label}
                 </text>
-                {/* Period label */}
                 {person.related_period && (
-                  <text
-                    x={x}
-                    y={y + 5.8}
-                    textAnchor="middle"
-                    fontSize="0.9"
-                    className="fill-muted-foreground"
-                    opacity={0.7}
-                  >
+                  <text x={x} y={y + 5.8} textAnchor="middle" fontSize="0.9"
+                    className="fill-muted-foreground" opacity={0.7} style={{ pointerEvents: 'none' }}>
                     {person.related_period}
                   </text>
                 )}
@@ -440,21 +531,44 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
           <text x="50" y="2.5" textAnchor="middle" fontSize="1.2" className="fill-muted-foreground" opacity="0.5">{TIER_LABELS[3]}</text>
         </svg>
 
-        {/* Detail panel (desktop) */}
+        {/* Context menu (right-click) */}
+        {contextMenu && (
+          <div
+            className="fixed z-50 bg-popover border rounded-lg shadow-lg py-1 min-w-40"
+            style={{ left: contextMenu.screenX, top: contextMenu.screenY }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-3 py-1.5 text-xs text-muted-foreground font-medium border-b mb-1">
+              {contextMenu.person.nickname || contextMenu.person.name}
+            </div>
+            <div className="px-3 py-1 text-xs text-muted-foreground">Áthelyezés:</div>
+            {[1, 2, 3].map(tier => (
+              <button
+                key={tier}
+                disabled={contextMenu.currentTier === tier}
+                onClick={() => movePerson(contextMenu.person, tier)}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 disabled:opacity-40 disabled:cursor-default`}
+              >
+                <span className={`w-2 h-2 rounded-full ${tier === 1 ? 'bg-rose-500' : tier === 2 ? 'bg-blue-500' : 'bg-amber-500'}`} />
+                {TIER_LABELS[tier]}
+                {contextMenu.currentTier === tier && <span className="ml-auto text-xs text-muted-foreground">jelenlegi</span>}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Detail panel */}
         {selectedPerson && (
           <div className="absolute top-4 right-4 w-72 bg-card border rounded-lg shadow-lg p-4 space-y-3 z-10">
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="font-semibold text-base">{selectedPerson.name}</h3>
-                {selectedPerson.nickname && (
-                  <p className="text-sm text-muted-foreground">({selectedPerson.nickname})</p>
-                )}
+                {selectedPerson.nickname && <p className="text-sm text-muted-foreground">({selectedPerson.nickname})</p>}
               </div>
               <Button variant="ghost" size="icon" className="h-6 w-6 -mr-1 -mt-1" onClick={() => setSelectedPerson(null)}>
                 <X className="w-3 h-3" />
               </Button>
             </div>
-
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">Kapcsolat:</span>
@@ -462,29 +576,21 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
                   {getRelConfig(selectedPerson.relationship_type).label}
                 </Badge>
               </div>
-
               {selectedPerson.related_period && (
-                <div>
-                  <span className="text-muted-foreground">Idoszak: </span>
-                  <span>{selectedPerson.related_period}</span>
-                </div>
+                <div><span className="text-muted-foreground">Idoszak: </span><span>{selectedPerson.related_period}</span></div>
               )}
-
               {selectedPerson.notes && (
                 <div>
                   <span className="text-muted-foreground block mb-0.5">Jegyzetek:</span>
                   <p className="text-xs bg-muted/50 rounded p-2">{selectedPerson.notes}</p>
                 </div>
               )}
-
               {selectedPerson.uncertainty && (
                 <div>
                   <span className="text-muted-foreground block mb-0.5">Bizonytalansag:</span>
                   <p className="text-xs bg-amber-50 dark:bg-amber-900/20 rounded p-2 text-amber-700 dark:text-amber-300">{selectedPerson.uncertainty}</p>
                 </div>
               )}
-
-              {/* Linked events */}
               {(() => {
                 const linked = getLinkedEvents(selectedPerson)
                 if (linked.length === 0) return null
@@ -492,16 +598,19 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
                   <div>
                     <span className="text-muted-foreground block mb-1">Kapcsolodo esemenyek:</span>
                     <div className="space-y-1">
-                      {linked.map(ev => (
-                        <div key={ev.id} className="text-xs bg-muted/50 rounded px-2 py-1">
-                          {ev.title}
-                        </div>
-                      ))}
+                      {linked.map(ev => <div key={ev.id} className="text-xs bg-muted/50 rounded px-2 py-1">{ev.title}</div>)}
                     </div>
                   </div>
                 )
               })()}
             </div>
+          </div>
+        )}
+
+        {/* Zoom hint */}
+        {zoom === 1 && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs text-muted-foreground/50 pointer-events-none">
+            Scroll = zoom · Drag = mozgás · Jobb klikk = áthelyezés
           </div>
         )}
       </div>
@@ -520,8 +629,7 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
                   const isSelected = selectedPerson?.id === person.id
                   const linked = getLinkedEvents(person)
                   return (
-                    <div
-                      key={person.id}
+                    <div key={person.id}
                       className={`border rounded-lg p-3 cursor-pointer transition-colors ${isSelected ? 'ring-2 ring-primary' : 'hover:bg-muted/50'}`}
                       onClick={() => setSelectedPerson(isSelected ? null : person)}
                     >
@@ -532,22 +640,14 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm truncate">{person.name}</span>
-                            {person.nickname && (
-                              <span className="text-xs text-muted-foreground truncate">({person.nickname})</span>
-                            )}
+                            {person.nickname && <span className="text-xs text-muted-foreground truncate">({person.nickname})</span>}
                           </div>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className={`${cfg.bg} ${cfg.color} border-0 text-[10px] px-1.5 py-0`}>
-                              {cfg.label}
-                            </Badge>
-                            {person.related_period && (
-                              <span className="text-[10px] text-muted-foreground">{person.related_period}</span>
-                            )}
+                            <Badge variant="outline" className={`${cfg.bg} ${cfg.color} border-0 text-[10px] px-1.5 py-0`}>{cfg.label}</Badge>
+                            {person.related_period && <span className="text-[10px] text-muted-foreground">{person.related_period}</span>}
                           </div>
                         </div>
                       </div>
-
-                      {/* Expanded details */}
                       {isSelected && (
                         <div className="mt-3 pt-3 border-t space-y-2 text-sm">
                           {person.notes && (
@@ -556,24 +656,27 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
                               <p className="text-xs bg-muted/50 rounded p-2">{person.notes}</p>
                             </div>
                           )}
-                          {person.uncertainty && (
-                            <div>
-                              <span className="text-muted-foreground text-xs block mb-0.5">Bizonytalansag:</span>
-                              <p className="text-xs bg-amber-50 dark:bg-amber-900/20 rounded p-2 text-amber-700 dark:text-amber-300">{person.uncertainty}</p>
-                            </div>
-                          )}
                           {linked.length > 0 && (
                             <div>
                               <span className="text-muted-foreground text-xs block mb-1">Kapcsolodo esemenyek:</span>
                               <div className="space-y-1">
-                                {linked.map(ev => (
-                                  <div key={ev.id} className="text-xs bg-muted/50 rounded px-2 py-1">
-                                    {ev.title}
-                                  </div>
-                                ))}
+                                {linked.map(ev => <div key={ev.id} className="text-xs bg-muted/50 rounded px-2 py-1">{ev.title}</div>)}
                               </div>
                             </div>
                           )}
+                          {/* Mobile tier move */}
+                          <div className="pt-1 border-t">
+                            <span className="text-muted-foreground text-xs block mb-1">Áthelyezés:</span>
+                            <div className="flex gap-1.5">
+                              {[1, 2, 3].map(t => (
+                                <button key={t} disabled={tier === t}
+                                  onClick={e => { e.stopPropagation(); movePerson(person, t) }}
+                                  className={`text-xs px-2 py-1 rounded border disabled:opacity-40 ${t === 1 ? 'border-rose-400 text-rose-600' : t === 2 ? 'border-blue-400 text-blue-600' : 'border-amber-400 text-amber-600'}`}>
+                                  {TIER_LABELS[t]}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
