@@ -143,6 +143,7 @@ export interface AppSettings {
   ttsModel: string
   ttsVoice: string
   ttsSpeed: number
+  ttsEnabled: boolean
   topicHints: boolean
   emotionalLayer: boolean
 }

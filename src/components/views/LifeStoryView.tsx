@@ -5,17 +5,26 @@ import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Edit3, Save, X, Users, MapPin, Calendar, Heart } from 'lucide-react'
+import { ArrowLeft, Edit3, Save, X, Users, MapPin, Calendar, Heart, Download, FileText, FileJson } from 'lucide-react'
 import { EmotionBadge } from './EmotionBadge'
+import { useAuthStore } from '@/stores/auth-store'
+import { exportAsJSON, exportAsPDF, exportAsDOCX } from '@/lib/export-service'
 
 interface LifeStoryViewProps {
   onBack: () => void
 }
 
 export function LifeStoryView({ onBack }: LifeStoryViewProps) {
-  const { lifeStory, persons, events, locations, emotions, updateLifeStory } = useLifeStoryStore()
+  const { lifeStory, persons, events, locations, timePeriods, emotions, openQuestions, updateLifeStory } = useLifeStoryStore()
+  const { profile } = useAuthStore()
   const [editing, setEditing] = useState(false)
   const [editContent, setEditContent] = useState('')
+  const [showExportMenu, setShowExportMenu] = useState(false)
+
+  const exportData = {
+    lifeStory, persons, events, locations, timePeriods, emotions, openQuestions,
+    displayName: profile?.display_name || undefined,
+  }
 
   const handleStartEdit = () => {
     setEditContent(lifeStory?.content || '')
@@ -64,20 +73,51 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
           </Button>
           <h2 className="font-semibold">Életutam</h2>
         </div>
-        {editing ? (
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
-              <X className="w-4 h-4 mr-1" /> Mégse
-            </Button>
-            <Button size="sm" onClick={handleSave}>
-              <Save className="w-4 h-4 mr-1" /> Mentés
-            </Button>
-          </div>
-        ) : (
-          <Button variant="outline" size="sm" onClick={handleStartEdit}>
-            <Edit3 className="w-4 h-4 mr-1" /> Szerkesztés
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {editing ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+                <X className="w-4 h-4 mr-1" /> Mégse
+              </Button>
+              <Button size="sm" onClick={handleSave}>
+                <Save className="w-4 h-4 mr-1" /> Mentés
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="relative">
+                <Button variant="outline" size="sm" onClick={() => setShowExportMenu(!showExportMenu)}>
+                  <Download className="w-4 h-4 mr-1" /> Export
+                </Button>
+                {showExportMenu && (
+                  <div className="absolute right-0 top-full mt-1 bg-popover border rounded-lg shadow-lg py-1 z-50 w-48">
+                    <button
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
+                      onClick={() => { exportAsPDF(exportData); setShowExportMenu(false) }}
+                    >
+                      <FileText className="w-4 h-4" /> PDF letöltés
+                    </button>
+                    <button
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
+                      onClick={() => { exportAsDOCX(exportData); setShowExportMenu(false) }}
+                    >
+                      <FileText className="w-4 h-4" /> Word (DOCX) letöltés
+                    </button>
+                    <button
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
+                      onClick={() => { exportAsJSON(exportData); setShowExportMenu(false) }}
+                    >
+                      <FileJson className="w-4 h-4" /> JSON letöltés
+                    </button>
+                  </div>
+                )}
+              </div>
+              <Button variant="outline" size="sm" onClick={handleStartEdit}>
+                <Edit3 className="w-4 h-4 mr-1" /> Szerkesztés
+              </Button>
+            </>
+          )}
+        </div>
       </div>
       <Tabs defaultValue="story" className="flex-1 flex flex-col">
         <div className="border-b px-4">

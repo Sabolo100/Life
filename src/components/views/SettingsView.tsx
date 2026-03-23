@@ -154,6 +154,18 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
               <div className="flex justify-between items-center">
                 <div>
+                  <Label>AI válaszok felolvasása</Label>
+                  <p className="text-xs text-muted-foreground">Minden AI válasz automatikus felolvasása</p>
+                </div>
+                <button
+                  onClick={() => settings.updateSettings({ ttsEnabled: !settings.ttsEnabled })}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${settings.ttsEnabled ? 'bg-primary' : 'bg-input'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${settings.ttsEnabled ? 'translate-x-5' : ''}`} />
+                </button>
+              </div>
+              <div className="flex justify-between items-center">
+                <div>
                   <Label>Témajavaslatok</Label>
                   <p className="text-xs text-muted-foreground">Javaslat-chipek a válaszok után</p>
                 </div>

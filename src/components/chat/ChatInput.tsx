@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Send } from 'lucide-react'
+import { VoiceInput } from './VoiceInput'
 
 interface ChatInputProps {
   onSend: (message: string) => void
@@ -39,6 +40,14 @@ export function ChatInput({ onSend, disabled, pendingMessage, onPendingConsumed 
     }
   }
 
+  const handleVoiceText = useCallback((text: string) => {
+    setValue(prev => {
+      const needsSpace = prev.length > 0 && !prev.endsWith(' ')
+      return prev + (needsSpace ? ' ' : '') + text
+    })
+    textareaRef.current?.focus()
+  }, [])
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -59,6 +68,7 @@ export function ChatInput({ onSend, disabled, pendingMessage, onPendingConsumed 
           rows={1}
           disabled={disabled}
         />
+        <VoiceInput onVoiceText={handleVoiceText} disabled={disabled} />
         <Button
           onClick={handleSubmit}
           disabled={!value.trim() || disabled}

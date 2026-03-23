@@ -21,6 +21,7 @@ interface LifeStoryState {
     emotions?: Partial<Emotion>[]
   }) => Promise<void>
   updateOpenQuestions: (questions: Partial<OpenQuestion>[]) => Promise<void>
+  geocodeLocation: (locationId: string) => Promise<void>
 }
 
 export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
@@ -109,6 +110,32 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
     }
 
     await get().loadAll()
+  },
+
+  geocodeLocation: async (locationId: string) => {
+    const location = get().locations.find(l => l.id === locationId)
+    if (!location) return
+
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location.name)}&format=json&limit=1`,
+      { headers: { 'User-Agent': 'EletutAI/1.0' } }
+    )
+    const results = await response.json()
+    if (results.length > 0) {
+      const { lat, lon } = results[0]
+      const coordinates = { lat: parseFloat(lat), lng: parseFloat(lon) }
+      await supabase
+        .from('locations')
+        .update({ coordinates })
+        .eq('id', locationId)
+      set(state => ({
+        locations: state.locations.map(l =>
+          l.id === locationId ? { ...l, coordinates } : l
+        ),
+      }))
+    } else {
+      throw new Error('Nem található')
+    }
   },
 
   updateOpenQuestions: async (questions) => {

@@ -1,18 +1,20 @@
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthStore } from '@/stores/auth-store'
-import { BookOpen, Settings, LogOut, Menu, FileText, Clock } from 'lucide-react'
+import { BookOpen, Settings, LogOut, Menu, FileText, Clock, MapPin, Users } from 'lucide-react'
 
 interface HeaderProps {
   onToggleSidebar: () => void
   onShowLifeStory: () => void
   onShowTimeline: () => void
+  onShowMap: () => void
+  onShowRelationships: () => void
   onShowSettings: () => void
   aiStatus: 'ok' | 'unknown' | 'error'
   storageStatus: 'ok' | 'error'
 }
 
-export function Header({ onToggleSidebar, onShowLifeStory, onShowTimeline, onShowSettings, aiStatus, storageStatus }: HeaderProps) {
+export function Header({ onToggleSidebar, onShowLifeStory, onShowTimeline, onShowMap, onShowRelationships, onShowSettings, aiStatus, storageStatus }: HeaderProps) {
   const { profile, signOut } = useAuthStore()
 
   const statusColor = (status: string) => {
@@ -59,15 +61,46 @@ export function Header({ onToggleSidebar, onShowLifeStory, onShowTimeline, onSho
             </TooltipContent>
           </Tooltip>
         </div>
-        <Button variant="ghost" size="icon" onClick={onShowLifeStory}>
-          <FileText className="w-4 h-4" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={onShowTimeline}>
-          <Clock className="w-4 h-4" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={onShowSettings}>
-          <Settings className="w-4 h-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant="ghost" size="icon" onClick={onShowLifeStory}>
+              <FileText className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Életút</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant="ghost" size="icon" onClick={onShowTimeline}>
+              <Clock className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Idővonal</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant="ghost" size="icon" onClick={onShowMap}>
+              <MapPin className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Térkép</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant="ghost" size="icon" onClick={onShowRelationships}>
+              <Users className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Kapcsolatok</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant="ghost" size="icon" onClick={onShowSettings}>
+              <Settings className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Beállítások</TooltipContent>
+        </Tooltip>
         {profile && (
           <span className="text-sm text-muted-foreground hidden sm:inline">{profile.display_name}</span>
         )}

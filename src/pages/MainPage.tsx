@@ -4,6 +4,8 @@ import { ChatView } from '@/components/chat/ChatView'
 import { SessionSidebar } from '@/components/chat/SessionSidebar'
 import { LifeStoryView } from '@/components/views/LifeStoryView'
 import { TimelineView } from '@/components/views/TimelineView'
+import { MapView } from '@/components/views/MapView'
+import { RelationshipView } from '@/components/views/RelationshipView'
 import { SettingsView } from '@/components/views/SettingsView'
 import { OpenQuestionsPanel } from '@/components/views/OpenQuestionsPanel'
 import { useChatStore } from '@/stores/chat-store'
@@ -14,7 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { HelpCircle } from 'lucide-react'
 
-type View = 'chat' | 'lifeStory' | 'timeline' | 'settings'
+type View = 'chat' | 'lifeStory' | 'timeline' | 'map' | 'relationships' | 'settings'
 
 export function MainPage() {
   const [currentView, setCurrentView] = useState<View>('chat')
@@ -36,9 +38,7 @@ export function MainPage() {
   }, [loadSessions, loadAll])
 
   useEffect(() => {
-    // Várjuk meg, amíg a sessziók betöltése befejeződik
     if (loading) return
-    // Ne fussunk le kétszer
     if (sessionInitialized.current) return
     sessionInitialized.current = true
 
@@ -51,7 +51,6 @@ export function MainPage() {
 
   const handleQuestionClick = useCallback((question: string) => {
     setPendingQuestion(question)
-    // Switch to chat view if not already there
     setCurrentView('chat')
   }, [])
 
@@ -59,13 +58,17 @@ export function MainPage() {
     setPendingQuestion(null)
   }, [])
 
+  const toggleView = (view: View) => setCurrentView(currentView === view ? 'chat' : view)
+
   return (
     <div className="h-screen flex flex-col">
       <Header
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-        onShowLifeStory={() => setCurrentView(currentView === 'lifeStory' ? 'chat' : 'lifeStory')}
-        onShowTimeline={() => setCurrentView(currentView === 'timeline' ? 'chat' : 'timeline')}
-        onShowSettings={() => setCurrentView(currentView === 'settings' ? 'chat' : 'settings')}
+        onShowLifeStory={() => toggleView('lifeStory')}
+        onShowTimeline={() => toggleView('timeline')}
+        onShowMap={() => toggleView('map')}
+        onShowRelationships={() => toggleView('relationships')}
+        onShowSettings={() => toggleView('settings')}
         aiStatus={aiStatus}
         storageStatus={storageStatus}
       />
@@ -95,6 +98,12 @@ export function MainPage() {
           {currentView === 'timeline' && (
             <TimelineView onBack={() => setCurrentView('chat')} />
           )}
+          {currentView === 'map' && (
+            <MapView onBack={() => setCurrentView('chat')} />
+          )}
+          {currentView === 'relationships' && (
+            <RelationshipView onBack={() => setCurrentView('chat')} />
+          )}
           {currentView === 'settings' && (
             <SettingsView onBack={() => setCurrentView('chat')} />
           )}
@@ -119,7 +128,7 @@ export function MainPage() {
                   )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="left">Nyitott kerdesek</TooltipContent>
+              <TooltipContent side="left">Nyitott kérdések</TooltipContent>
             </Tooltip>
           )}
         </main>

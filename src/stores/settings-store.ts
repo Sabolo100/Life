@@ -13,6 +13,7 @@ export const useSettingsStore = create<SettingsState>()(
       ttsModel: 'eleven_multilingual_v2',
       ttsVoice: 'male',
       ttsSpeed: 1.0,
+      ttsEnabled: false,
       topicHints: true,
       emotionalLayer: true,
       updateSettings: (updates) => set(updates),
