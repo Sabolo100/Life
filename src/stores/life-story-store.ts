@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
-import type { LifeStory, Person, LifeEvent, Location, TimePeriod, Emotion, OpenQuestion } from '@/types'
+import type { LifeStory, Person, LifeEvent, Location, TimePeriod, Emotion, OpenQuestion, FamilyRelationship, FamilyRelType } from '@/types'
 
 interface LifeStoryState {
   lifeStory: LifeStory | null
@@ -10,6 +10,7 @@ interface LifeStoryState {
   timePeriods: TimePeriod[]
   emotions: Emotion[]
   openQuestions: OpenQuestion[]
+  familyRelationships: FamilyRelationship[]
   loading: boolean
   loadAll: () => Promise<void>
   updateLifeStory: (content: string) => Promise<void>
@@ -24,6 +25,8 @@ interface LifeStoryState {
   geocodeLocation: (locationId: string) => Promise<void>
   confirmLocation: (locationId: string) => Promise<void>
   updateLocationCoordinates: (locationId: string, coordinates: { lat: number; lng: number }) => Promise<void>
+  addFamilyRelationship: (fromPersonId: string | null, toPersonId: string | null, type: FamilyRelType) => Promise<void>
+  removeFamilyRelationship: (id: string) => Promise<void>
 }
 
 export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
@@ -34,6 +37,7 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   timePeriods: [],
   emotions: [],
   openQuestions: [],
+  familyRelationships: [],
   loading: false,
 
   loadAll: async () => {
@@ -41,7 +45,7 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { set({ loading: false }); return }
 
-    const [storyRes, personsRes, eventsRes, locationsRes, periodsRes, emotionsRes, questionsRes] = await Promise.all([
+    const [storyRes, personsRes, eventsRes, locationsRes, periodsRes, emotionsRes, questionsRes, famRelRes] = await Promise.all([
       supabase.from('life_stories').select('*').eq('user_id', user.id).single(),
       supabase.from('persons').select('*').eq('user_id', user.id).order('name'),
       supabase.from('events').select('*').eq('user_id', user.id).order('created_at'),
@@ -49,6 +53,7 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
       supabase.from('time_periods').select('*').eq('user_id', user.id),
       supabase.from('emotions').select('*').eq('user_id', user.id),
       supabase.from('open_questions').select('*').eq('user_id', user.id).eq('status', 'open').order('priority', { ascending: false }),
+      supabase.from('family_relationships').select('*').eq('user_id', user.id),
     ])
 
     set({
@@ -59,6 +64,7 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
       timePeriods: (periodsRes.data as TimePeriod[]) || [],
       emotions: (emotionsRes.data as Emotion[]) || [],
       openQuestions: (questionsRes.data as OpenQuestion[]) || [],
+      familyRelationships: (famRelRes.data as FamilyRelationship[]) || [],
       loading: false,
     })
   },
@@ -215,5 +221,29 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
       .eq('status', 'open')
       .order('priority', { ascending: false })
     set({ openQuestions: (data as OpenQuestion[]) || [] })
+  },
+
+  addFamilyRelationship: async (fromPersonId, toPersonId, type) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data, error } = await supabase
+      .from('family_relationships')
+      .insert({
+        user_id: user.id,
+        from_person_id: fromPersonId,
+        to_person_id: toPersonId,
+        relationship_type: type,
+      })
+      .select()
+      .single()
+    if (error) { console.error('[addFamilyRelationship] error:', error); return }
+    if (data) {
+      set(state => ({ familyRelationships: [...state.familyRelationships, data as FamilyRelationship] }))
+    }
+  },
+
+  removeFamilyRelationship: async (id) => {
+    await supabase.from('family_relationships').delete().eq('id', id)
+    set(state => ({ familyRelationships: state.familyRelationships.filter(r => r.id !== id) }))
   },
 }))

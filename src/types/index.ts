@@ -126,6 +126,17 @@ export interface OpenQuestion {
   addressed_at: string | null
 }
 
+export type FamilyRelType = 'parent' | 'child' | 'spouse' | 'sibling'
+
+export interface FamilyRelationship {
+  id: string
+  user_id: string
+  from_person_id: string | null   // null = self (the user)
+  to_person_id: string | null     // null = self (the user)
+  relationship_type: FamilyRelType
+  created_at: string
+}
+
 // AI response types
 export interface AIResponse {
   message: string

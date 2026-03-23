@@ -1,10 +1,15 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useLifeStoryStore } from '@/stores/life-story-store'
+import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Users, X, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
+import { ArrowLeft, Users, X, ZoomIn, ZoomOut, Maximize2, Network, GitBranchPlus } from 'lucide-react'
 import type { Person, LifeEvent } from '@/types'
 import { supabase } from '@/lib/supabase'
+import { FamilyTreeView } from './FamilyTreeView'
+
+type ViewMode = 'network' | 'familyTree'
+type FilterMode = 'all' | 'family' | 'friends'
 
 interface RelationshipViewProps {
   onBack: () => void
@@ -207,6 +212,9 @@ interface ContextMenuState {
 
 export function RelationshipView({ onBack }: RelationshipViewProps) {
   const { persons, events, loadAll } = useLifeStoryStore()
+  const { profile } = useAuthStore()
+  const [viewMode, setViewMode] = useState<ViewMode>('network')
+  const [filter, setFilter] = useState<FilterMode>('all')
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [tierOverrides, setTierOverrides] = useState<Record<string, number>>({})
@@ -316,13 +324,21 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
   const getLinkedEvents = (person: Person): LifeEvent[] =>
     events.filter(e => (e.person_ids || []).includes(person.id) || (person.related_event_ids || []).includes(e.id))
 
+  // Filter persons based on filter mode
+  const filteredPersons = useMemo(() => {
+    if (filter === 'all') return persons
+    if (filter === 'family') return persons.filter(p => (tierOverrides[p.id] ?? getRelConfig(p.relationship_type).tier) === 1)
+    if (filter === 'friends') return persons.filter(p => (tierOverrides[p.id] ?? getRelConfig(p.relationship_type).tier) === 2)
+    return persons
+  }, [persons, filter, tierOverrides])
+
   // Calculate positions with collision detection
   const positions = useMemo((): PersonPosition[] => {
     const cx = 50
     const cy = 50
 
     const tiers: Person[][] = [[], [], [], []]
-    persons.forEach(p => {
+    filteredPersons.forEach(p => {
       const tier = tierOverrides[p.id] ?? getRelConfig(p.relationship_type).tier
       tiers[tier].push(p)
     })
@@ -387,12 +403,12 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
     }
 
     return result
-  }, [persons, tierOverrides])
+  }, [filteredPersons, tierOverrides])
 
   // Group persons by tier for list view
   const groupedPersons = useMemo(() => {
     const groups: Record<number, Person[]> = { 1: [], 2: [], 3: [] }
-    persons.forEach(p => {
+    filteredPersons.forEach(p => {
       const tier = tierOverrides[p.id] ?? getRelConfig(p.relationship_type).tier
       groups[tier].push(p)
     })
@@ -404,14 +420,14 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
       <div className="h-full flex flex-col">
         <div className="flex items-center gap-2 p-4 border-b">
           <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="w-4 h-4" /></Button>
-          <h2 className="font-semibold">Kapcsolati halo</h2>
+          <h2 className="font-semibold">Személyek</h2>
         </div>
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center space-y-3">
             <Users className="w-12 h-12 mx-auto text-muted-foreground/50" />
-            <h3 className="text-lg font-medium text-muted-foreground">Meg nincsenek szemelyek</h3>
+            <h3 className="text-lg font-medium text-muted-foreground">Még nincsenek személyek</h3>
             <p className="text-sm text-muted-foreground/70 max-w-sm">
-              Meseld el az elettorteneteidet a chatben, es az AI automatikusan felismeri es rogziti az emlitett szemelyeket.
+              Meséld el az élettörténeteidet a chatben, és az AI automatikusan felismeri és rögzíti az említett személyeket.
             </p>
           </div>
         </div>
@@ -427,24 +443,67 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-2 p-4 border-b shrink-0">
+      <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
         <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="w-4 h-4" /></Button>
-        <h2 className="font-semibold">Kapcsolati halo</h2>
-        <Badge variant="secondary" className="ml-auto">{persons.length} szemely</Badge>
-        {/* Zoom controls */}
-        <div className="flex items-center gap-1 ml-2">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
-            const newZoom = Math.min(5, zoom * 1.3)
-            setZoom(newZoom)
-          }}><ZoomIn className="w-3.5 h-3.5" /></Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
-            const newZoom = Math.max(1, zoom / 1.3)
-            setZoom(newZoom)
-            if (newZoom <= 1) setPan({ x: 0, y: 0 })
-          }}><ZoomOut className="w-3.5 h-3.5" /></Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetView}><Maximize2 className="w-3.5 h-3.5" /></Button>
+        <h2 className="font-semibold">Személyek</h2>
+        <Badge variant="secondary" className="text-xs">{persons.length}</Badge>
+
+        {/* View mode tabs */}
+        <div className="flex items-center gap-0.5 ml-auto bg-muted rounded-lg p-0.5">
+          <button
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${viewMode === 'network' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            onClick={() => setViewMode('network')}
+          >
+            <Network className="w-3.5 h-3.5" /> Háló
+          </button>
+          <button
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${viewMode === 'familyTree' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            onClick={() => setViewMode('familyTree')}
+          >
+            <GitBranchPlus className="w-3.5 h-3.5" /> Családfa
+          </button>
         </div>
+
+        {/* Zoom controls (only for network view) */}
+        {viewMode === 'network' && (
+          <div className="flex items-center gap-1 ml-2">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+              const newZoom = Math.min(5, zoom * 1.3)
+              setZoom(newZoom)
+            }}><ZoomIn className="w-3.5 h-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+              const newZoom = Math.max(1, zoom / 1.3)
+              setZoom(newZoom)
+              if (newZoom <= 1) setPan({ x: 0, y: 0 })
+            }}><ZoomOut className="w-3.5 h-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetView}><Maximize2 className="w-3.5 h-3.5" /></Button>
+          </div>
+        )}
       </div>
+
+      {/* Filter pills - only for network view */}
+      {viewMode === 'network' && (
+        <div className="flex items-center gap-1.5 px-4 py-2 border-b shrink-0">
+          {([['all', 'Mind'], ['family', 'Család'], ['friends', 'Barátok']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${filter === key
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Family tree view */}
+      {viewMode === 'familyTree' ? (
+        <FamilyTreeView selfName={profile?.display_name || 'Én'} />
+      ) : (
+        <>
 
       {/* Radial layout - hidden on mobile */}
       <div className="flex-1 overflow-hidden relative hidden md:block">
@@ -687,6 +746,8 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
           )
         })}
       </div>
+      </>
+      )}
     </div>
   )
 }
