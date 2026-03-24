@@ -671,14 +671,24 @@ export function FamilyTreeView({ selfName }: FamilyTreeViewProps) {
       })
   }
 
+  const [addRelError, setAddRelError] = useState<string | null>(null)
+
   // Add relationship handler
   const handleAddRelationship = async () => {
     if (!selectedNodeId || !newRelPersonId) return
     const fromId = selectedNodeId === 'self' ? null : selectedNodeId
     const toId = newRelPersonId === 'self' ? null : newRelPersonId
-    await addFamilyRelationship(fromId, toId, newRelType)
-    setAddingRel(false)
-    setNewRelPersonId('')
+    setAddRelError(null)
+    try {
+      await addFamilyRelationship(fromId, toId, newRelType)
+      setAddingRel(false)
+      setNewRelPersonId('')
+    } catch (err: unknown) {
+      const msg = err && typeof err === 'object' && 'message' in err
+        ? String((err as { message: string }).message)
+        : 'Ismeretlen hiba'
+      setAddRelError(`Hiba: ${msg}`)
+    }
   }
 
   // Available persons for relationship (exclude already connected and self-reference)
@@ -801,10 +811,13 @@ export function FamilyTreeView({ selfName }: FamilyTreeViewProps) {
                   <Button size="sm" className="flex-1 text-xs" disabled={!newRelPersonId} onClick={handleAddRelationship}>
                     Hozzáadás
                   </Button>
-                  <Button size="sm" variant="ghost" className="text-xs" onClick={() => { setAddingRel(false); setSelectedNodeId(null) }}>
+                  <Button size="sm" variant="ghost" className="text-xs" onClick={() => { setAddingRel(false); setSelectedNodeId(null); setAddRelError(null) }}>
                     Mégse
                   </Button>
                 </div>
+                {addRelError && (
+                  <p className="text-xs text-red-500 mt-1">{addRelError}</p>
+                )}
               </div>
             )}
           </div>
@@ -1072,10 +1085,13 @@ export function FamilyTreeView({ selfName }: FamilyTreeViewProps) {
                 <Button size="sm" className="flex-1 text-xs" disabled={!newRelPersonId} onClick={handleAddRelationship}>
                   Hozzáadás
                 </Button>
-                <Button size="sm" variant="ghost" className="text-xs" onClick={() => setAddingRel(false)}>
+                <Button size="sm" variant="ghost" className="text-xs" onClick={() => { setAddingRel(false); setAddRelError(null) }}>
                   Mégse
                 </Button>
               </div>
+              {addRelError && (
+                <p className="text-xs text-red-500 mt-1">{addRelError}</p>
+              )}
             </div>
           ) : (
             <Button

@@ -253,7 +253,7 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
       })
       .select()
       .single()
-    if (error) { console.error('[addFamilyRelationship] error:', error); return }
+    if (error) { console.error('[addFamilyRelationship] error:', error); throw error }
     if (data) {
       set(state => ({ familyRelationships: [...state.familyRelationships, data as FamilyRelationship] }))
     }
