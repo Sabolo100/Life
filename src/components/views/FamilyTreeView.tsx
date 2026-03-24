@@ -256,10 +256,20 @@ function layoutTree(
 
       for (const nodeId of groupNodes) {
         if (placed.has(nodeId)) continue
+
+        // Place any unplaced ex-spouses BEFORE this node → appear to its LEFT
+        for (const ex of (adj.get(nodeId)?.exSpouses || [])) {
+          if (generations.get(ex) === g && groupNodes.includes(ex) && !placed.has(ex)) {
+            placed.add(ex)
+            arranged.push(ex)
+          }
+        }
+
         placed.add(nodeId)
         arranged.push(nodeId)
-        // Only current spouses are placed immediately adjacent; ex-spouses stay in normal order
-        for (const s of adj.get(nodeId)?.spouses || []) {
+
+        // Place current spouses immediately AFTER → appear to its RIGHT
+        for (const s of (adj.get(nodeId)?.spouses || [])) {
           if (generations.get(s) === g && groupNodes.includes(s) && !placed.has(s)) {
             placed.add(s)
             arranged.push(s)
@@ -441,40 +451,59 @@ function layoutTree(
     }
   }
 
-  // Build family unit T-connectors
-  // One FamilyUnitEdge per unique parent-couple → children group
+  // Build family unit T-connectors.
+  // Two-pass per parent:
+  //   Pass 1 – explicit co-parents: partner has child relationships overlapping this node's children
+  //            → creates a separate T-connector per (node, partner) couple
+  //   Pass 2 – fallback: remaining children (no explicit co-parent) use the current spouse as
+  //            visual co-parent so the stem rises from the couple-line midpoint, not the box bottom
   const familyUnits: FamilyUnitEdge[] = []
   const fuSet = new Set<string>()
   for (const [nodeId, neighbors] of adj) {
     if (!nodePositions.has(nodeId)) continue
     const g = generations.get(nodeId)!
-    const children = neighbors.children.filter(c => nodePositions.has(c))
-    if (children.length === 0) continue
+    const allChildren = neighbors.children.filter(c => nodePositions.has(c))
+    if (allChildren.length === 0) continue
 
-    // Consider both current spouses and ex-spouses as potential co-parents
+    const assignedChildren = new Set<NodeId>()
+
+    // Pass 1: explicit co-parent families (both share at least one child)
     const allPartners = [
       ...neighbors.spouses.filter(s => generations.get(s) === g && nodePositions.has(s)),
       ...neighbors.exSpouses.filter(s => generations.get(s) === g && nodePositions.has(s)),
     ]
-    let partner: NodeId | null = null
-    for (const s of allPartners) {
-      if ((adj.get(s)?.children || []).some(c => children.includes(c))) { partner = s; break }
+    for (const partner of allPartners) {
+      const partnerChildren = adj.get(partner)?.children ?? []
+      const sharedChildren = allChildren.filter(c => partnerChildren.includes(c) && !assignedChildren.has(c))
+      if (sharedChildren.length === 0) continue
+
+      const fuKey = [nodeId, partner].sort().join('||')
+      if (fuSet.has(fuKey)) continue
+      fuSet.add(fuKey)
+
+      // All children belonging to this couple (union of both sides)
+      const coupleChildren = new Set(sharedChildren)
+      for (const c of partnerChildren) {
+        if (nodePositions.has(c) && !assignedChildren.has(c)) coupleChildren.add(c)
+      }
+      for (const c of coupleChildren) assignedChildren.add(c)
+
+      familyUnits.push({ parentIds: [nodeId, partner], childIds: [...coupleChildren] })
     }
 
-    const fuKey = partner ? [nodeId, partner].sort().join('||') : nodeId
+    // Pass 2: remaining children → fall back to current spouse as visual co-parent
+    // This ensures the T-connector stem starts from the couple line midpoint, not the box bottom
+    const remaining = allChildren.filter(c => !assignedChildren.has(c))
+    if (remaining.length === 0) continue
+
+    const currentSpouse = neighbors.spouses.find(s => generations.get(s) === g && nodePositions.has(s)) ?? null
+    const fuKey = currentSpouse ? [nodeId, currentSpouse].sort().join('||') : nodeId
     if (fuSet.has(fuKey)) continue
     fuSet.add(fuKey)
 
-    const allChildren = new Set(children)
-    if (partner) {
-      for (const c of adj.get(partner)?.children || []) {
-        if (nodePositions.has(c)) allChildren.add(c)
-      }
-    }
-
     familyUnits.push({
-      parentIds: partner ? [nodeId, partner] : [nodeId],
-      childIds: [...allChildren],
+      parentIds: currentSpouse ? [nodeId, currentSpouse] : [nodeId],
+      childIds: remaining,
     })
   }
 
