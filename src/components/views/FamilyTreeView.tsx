@@ -17,6 +17,7 @@ const REL_TYPE_LABELS: Record<FamilyRelType, string> = {
   parent: 'Szülő',
   child: 'Gyerek',
   spouse: 'Házastárs',
+  ex_spouse: 'Volt partner',
   sibling: 'Testvér',
 }
 
@@ -24,6 +25,7 @@ const INVERSE_REL: Record<FamilyRelType, FamilyRelType> = {
   parent: 'child',
   child: 'parent',
   spouse: 'spouse',
+  ex_spouse: 'ex_spouse',
   sibling: 'sibling',
 }
 
@@ -42,7 +44,7 @@ interface TreeNode {
 }
 
 interface TreeEdge {
-  type: 'spouse'
+  type: 'spouse' | 'ex_spouse'
   fromId: NodeId
   toId: NodeId
 }
@@ -56,10 +58,10 @@ interface FamilyUnitEdge {
 // ── Layout algorithm ───────────────────────────────────────────────────────
 
 function buildAdjacency(relationships: FamilyRelationship[]) {
-  const adj = new Map<NodeId, { parents: NodeId[]; children: NodeId[]; spouses: NodeId[]; siblings: NodeId[] }>()
+  const adj = new Map<NodeId, { parents: NodeId[]; children: NodeId[]; spouses: NodeId[]; exSpouses: NodeId[]; siblings: NodeId[] }>()
 
   const ensure = (id: NodeId) => {
-    if (!adj.has(id)) adj.set(id, { parents: [], children: [], spouses: [], siblings: [] })
+    if (!adj.has(id)) adj.set(id, { parents: [], children: [], spouses: [], exSpouses: [], siblings: [] })
     return adj.get(id)!
   }
 
@@ -85,6 +87,10 @@ function buildAdjacency(relationships: FamilyRelationship[]) {
       case 'spouse':
         if (!fromAdj.spouses.includes(toId)) fromAdj.spouses.push(toId)
         if (!toAdj.spouses.includes(fromId)) toAdj.spouses.push(fromId)
+        break
+      case 'ex_spouse':
+        if (!fromAdj.exSpouses.includes(toId)) fromAdj.exSpouses.push(toId)
+        if (!toAdj.exSpouses.includes(fromId)) toAdj.exSpouses.push(fromId)
         break
       case 'sibling':
         if (!fromAdj.siblings.includes(toId)) fromAdj.siblings.push(toId)
@@ -136,6 +142,9 @@ function assignGenerations(adj: ReturnType<typeof buildAdjacency>): Map<NodeId, 
     }
     for (const s of neighbors.spouses) {
       if (!gen.has(s)) { gen.set(s, g); queue.push(s) }
+    }
+    for (const ex of neighbors.exSpouses) {
+      if (!gen.has(ex)) { gen.set(ex, g); queue.push(ex) }
     }
     for (const sib of neighbors.siblings) {
       if (!gen.has(sib)) { gen.set(sib, g); queue.push(sib) }
@@ -209,7 +218,9 @@ function layoutTree(
 
     for (const nodeId of nodeIds) {
       const nk = nodeToKey.get(nodeId)!
-      for (const sp of (adj.get(nodeId)?.spouses ?? [])) {
+      // Merge groups for both current spouses and ex-spouses so they share a family group
+      const allPartners = [...(adj.get(nodeId)?.spouses ?? []), ...(adj.get(nodeId)?.exSpouses ?? [])]
+      for (const sp of allPartners) {
         const sk = nodeToKey.get(sp)
         if (sk && sk !== nk) ufUnion(nk, sk)
       }
@@ -247,6 +258,7 @@ function layoutTree(
         if (placed.has(nodeId)) continue
         placed.add(nodeId)
         arranged.push(nodeId)
+        // Only current spouses are placed immediately adjacent; ex-spouses stay in normal order
         for (const s of adj.get(nodeId)?.spouses || []) {
           if (generations.get(s) === g && groupNodes.includes(s) && !placed.has(s)) {
             placed.add(s)
@@ -258,8 +270,8 @@ function layoutTree(
       for (let i = 0; i < arranged.length; i++) {
         const nodeId = arranged[i]
         const prevId = i > 0 ? arranged[i - 1] : null
-        const isSpouseOfPrev = prevId && (adj.get(prevId)?.spouses || []).includes(nodeId)
-        if (i > 0) x += isSpouseOfPrev ? SPOUSE_GAP : H_GAP
+        const isCurrentSpouseOfPrev = prevId && (adj.get(prevId)?.spouses || []).includes(nodeId)
+        if (i > 0) x += isCurrentSpouseOfPrev ? SPOUSE_GAP : H_GAP
         nodePositions.set(nodeId, { x, y: (g - minGen) * (NODE_H + V_GAP) })
         x += NODE_W
       }
@@ -314,10 +326,10 @@ function layoutTree(
       const childXs = [...refChildren].map(c => nodePositions.get(c)!.x + NODE_W / 2)
       const childrenCenter = (Math.min(...childXs) + Math.max(...childXs)) / 2
 
-      // Expand group to include spouses of each sibling
+      // Expand group to include spouses and ex-spouses of each sibling
       const fullGroup = new Set(group)
       for (const id of group) {
-        for (const sp of (adj.get(id)?.spouses ?? [])) {
+        for (const sp of [...(adj.get(id)?.spouses ?? []), ...(adj.get(id)?.exSpouses ?? [])]) {
           if (generations.get(sp) === g && nodePositions.has(sp)) fullGroup.add(sp)
         }
       }
@@ -406,7 +418,7 @@ function layoutTree(
     })
   }
 
-  // Build spouse edges only (parent-child connections use family unit T-connectors)
+  // Build spouse and ex-spouse edges (parent-child connections use family unit T-connectors)
   const edges: TreeEdge[] = []
   const spouseSet = new Set<string>()
   for (const [nodeId, neighbors] of adj) {
@@ -417,6 +429,14 @@ function layoutTree(
       if (!spouseSet.has(key1) && !spouseSet.has(key2)) {
         spouseSet.add(key1)
         edges.push({ type: 'spouse', fromId: nodeId, toId: spouseId })
+      }
+    }
+    for (const exId of neighbors.exSpouses) {
+      if (!nodePositions.has(exId)) continue
+      const key1 = `ex:${nodeId}:${exId}`, key2 = `ex:${exId}:${nodeId}`
+      if (!spouseSet.has(key1) && !spouseSet.has(key2)) {
+        spouseSet.add(key1)
+        edges.push({ type: 'ex_spouse', fromId: nodeId, toId: exId })
       }
     }
   }
@@ -431,10 +451,13 @@ function layoutTree(
     const children = neighbors.children.filter(c => nodePositions.has(c))
     if (children.length === 0) continue
 
-    const spouses = neighbors.spouses.filter(s => generations.get(s) === g && nodePositions.has(s))
-    // Find the spouse that shares children (prefer shared-children spouse)
+    // Consider both current spouses and ex-spouses as potential co-parents
+    const allPartners = [
+      ...neighbors.spouses.filter(s => generations.get(s) === g && nodePositions.has(s)),
+      ...neighbors.exSpouses.filter(s => generations.get(s) === g && nodePositions.has(s)),
+    ]
     let partner: NodeId | null = null
-    for (const s of spouses) {
+    for (const s of allPartners) {
       if ((adj.get(s)?.children || []).some(c => children.includes(c))) { partner = s; break }
     }
 
@@ -483,6 +506,12 @@ function inferFamilyRelFromType(relType: string): {
   const childKeywords = ['gyerek', 'gyermek', 'fiam', 'lányom', 'fiú', 'leány']
   if (childKeywords.some(k => t === k || t.includes(k))) {
     return { type: 'child', direction: 'to_is_person' }
+  }
+
+  // Ex-spouse (check before spouse to avoid misclassifying)
+  const exSpouseKeywords = ['volt feleség', 'volt férj', 'volt partner', 'elvált', 'exfeleség', 'exférj', 'ex-feleség', 'ex-férj', 'ex ']
+  if (exSpouseKeywords.some(k => t === k || t.includes(k))) {
+    return { type: 'ex_spouse', direction: 'to_is_person' }
   }
 
   // Spouse
@@ -754,6 +783,7 @@ export function FamilyTreeView({ selfName }: FamilyTreeViewProps) {
                     <option value="parent">Szülőm</option>
                     <option value="child">Gyerekem</option>
                     <option value="spouse">Házastársam</option>
+                    <option value="ex_spouse">Volt partnerem</option>
                     <option value="sibling">Testvérem</option>
                   </select>
                 </div>
@@ -834,7 +864,7 @@ export function FamilyTreeView({ selfName }: FamilyTreeViewProps) {
           </filter>
         </defs>
 
-        {/* Spouse edges */}
+        {/* Spouse and ex-spouse edges */}
         {edges.map((edge, i) => {
           const from = nodeMap.get(edge.fromId)
           const to = nodeMap.get(edge.toId)
@@ -842,6 +872,16 @@ export function FamilyTreeView({ selfName }: FamilyTreeViewProps) {
           const y = from.y + NODE_H / 2
           const x1 = Math.min(from.x, to.x) + NODE_W
           const x2 = Math.max(from.x, to.x)
+          if (x2 <= x1) return null // same box or overlapping, skip
+          if (edge.type === 'ex_spouse') {
+            return (
+              <g key={`sp-${i}`}>
+                <line x1={x1} y1={y} x2={x2} y2={y}
+                  stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="6,4" />
+                <text x={(x1 + x2) / 2} y={y - 3} textAnchor="middle" fontSize="9" fill="#94a3b8">✂</text>
+              </g>
+            )
+          }
           return (
             <g key={`sp-${i}`}>
               <line x1={x1} y1={y} x2={x2} y2={y} stroke="#e11d48" strokeWidth="2" />
@@ -1014,6 +1054,7 @@ export function FamilyTreeView({ selfName }: FamilyTreeViewProps) {
                   <option value="parent">Szülője</option>
                   <option value="child">Gyereke</option>
                   <option value="spouse">Házastársa</option>
+                  <option value="ex_spouse">Volt partnere</option>
                   <option value="sibling">Testvére</option>
                 </select>
               </div>

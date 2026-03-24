@@ -126,7 +126,7 @@ export interface OpenQuestion {
   addressed_at: string | null
 }
 
-export type FamilyRelType = 'parent' | 'child' | 'spouse' | 'sibling'
+export type FamilyRelType = 'parent' | 'child' | 'spouse' | 'ex_spouse' | 'sibling'
 
 export interface FamilyRelationship {
   id: string
