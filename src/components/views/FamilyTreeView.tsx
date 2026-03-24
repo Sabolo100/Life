@@ -234,41 +234,94 @@ function layoutTree(
     for (const id of nodeIds) nodePositions.get(id)!.x += offset
   }
 
-  // Centering pass: shift each PARENT COUPLE to center over their children.
-  // We shift parents, never children, so siblings always stay together.
-  const processedCouples = new Set<NodeId>()
-  for (const g of sortedGens) {
+  // Ancestor centering pass: process gen -1, -2, ... outward from gen 0.
+  // For each ancestor generation, group nodes into sibling families and shift each
+  // family group AS A WHOLE to center above their children in the already-positioned refGen (g+1).
+  // Processing outward ensures each gen centers above the final positions of the gen below it.
+  for (let g = -1; g >= (sortedGens[0] ?? 0); g--) {
+    if (!genGroups.has(g)) continue
     const nodeIds = genGroups.get(g)!
-    for (const nodeId of nodeIds) {
-      if (processedCouples.has(nodeId)) continue
+    const refGen = g + 1
 
-      const nextGen = g + 1
-      const directChildren = (adj.get(nodeId)?.children || [])
-        .filter(c => nodePositions.has(c) && generations.get(c) === nextGen)
-      if (directChildren.length === 0) continue
-
-      const spouses = (adj.get(nodeId)?.spouses || [])
-        .filter(s => generations.get(s) === g && nodePositions.has(s))
-      processedCouples.add(nodeId)
-      for (const s of spouses) processedCouples.add(s)
-
-      // All children of this couple (union)
-      const allChildren = new Set(directChildren)
-      for (const s of spouses) {
-        for (const c of adj.get(s)?.children || []) {
-          if (nodePositions.has(c) && generations.get(c) === nextGen) allChildren.add(c)
+    // BFS to build sibling groups (connected components through sibling edges)
+    const visited = new Set<NodeId>()
+    for (const startNode of nodeIds) {
+      if (visited.has(startNode)) continue
+      const group: NodeId[] = []
+      const q: NodeId[] = [startNode]
+      visited.add(startNode)
+      while (q.length > 0) {
+        const id = q.shift()!
+        group.push(id)
+        for (const sib of (adj.get(id)?.siblings ?? [])) {
+          if (!visited.has(sib) && nodeIds.includes(sib)) {
+            visited.add(sib)
+            q.push(sib)
+          }
         }
       }
 
-      const childXs = [...allChildren].map(c => nodePositions.get(c)!.x + NODE_W / 2)
+      // Collect all children of this sibling group in refGen
+      const refChildren = new Set<NodeId>()
+      for (const id of group) {
+        for (const c of (adj.get(id)?.children ?? [])) {
+          if (generations.get(c) === refGen && nodePositions.has(c)) refChildren.add(c)
+        }
+      }
+      if (refChildren.size === 0) continue
+
+      const childXs = [...refChildren].map(c => nodePositions.get(c)!.x + NODE_W / 2)
       const childrenCenter = (Math.min(...childXs) + Math.max(...childXs)) / 2
 
-      const parentXs = [nodeId, ...spouses].map(p => nodePositions.get(p)!.x)
-      const coupleCenter = (Math.min(...parentXs) + Math.max(...parentXs) + NODE_W) / 2
+      // Expand group to include spouses of each sibling
+      const fullGroup = new Set(group)
+      for (const id of group) {
+        for (const sp of (adj.get(id)?.spouses ?? [])) {
+          if (generations.get(sp) === g && nodePositions.has(sp)) fullGroup.add(sp)
+        }
+      }
 
-      const shift = childrenCenter - coupleCenter
+      const groupXs = [...fullGroup].map(id => nodePositions.get(id)!.x)
+      const groupCenter = (Math.min(...groupXs) + Math.max(...groupXs) + NODE_W) / 2
+
+      const shift = childrenCenter - groupCenter
       if (Math.abs(shift) > 0.5) {
-        for (const p of [nodeId, ...spouses]) nodePositions.get(p)!.x += shift
+        for (const id of fullGroup) nodePositions.get(id)!.x += shift
+      }
+    }
+  }
+
+  // Descendant centering pass: process gen +1, +2, ... outward from gen 0.
+  // Shift each child group to center below their parent couple in the already-positioned refGen (g-1).
+  for (let g = 1; g <= (sortedGens[sortedGens.length - 1] ?? 0); g++) {
+    if (!genGroups.has(g)) continue
+    const nodeIds = genGroups.get(g)!
+    const refGen = g - 1
+
+    // Group children by their parent set in refGen
+    const groupMap = new Map<string, NodeId[]>()
+    for (const nodeId of nodeIds) {
+      const parents = (adj.get(nodeId)?.parents ?? [])
+        .filter(p => generations.get(p) === refGen && nodePositions.has(p))
+        .sort()
+      const key = parents.length > 0 ? parents.join('|') : `__orphan__${nodeId}`
+      if (!groupMap.has(key)) groupMap.set(key, [])
+      groupMap.get(key)!.push(nodeId)
+    }
+
+    for (const [key, group] of groupMap) {
+      if (key.startsWith('__orphan__')) continue
+
+      const parentIds = key.split('|')
+      const parentXs = parentIds.map(p => (nodePositions.get(p)?.x ?? 0) + NODE_W / 2)
+      const parentsCenter = (Math.min(...parentXs) + Math.max(...parentXs)) / 2
+
+      const childXs = group.map(c => nodePositions.get(c)!.x + NODE_W / 2)
+      const childrenCenter = (Math.min(...childXs) + Math.max(...childXs)) / 2
+
+      const shift = parentsCenter - childrenCenter
+      if (Math.abs(shift) > 0.5) {
+        for (const c of group) nodePositions.get(c)!.x += shift
       }
     }
   }
