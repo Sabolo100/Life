@@ -862,46 +862,41 @@ export function FamilyTreeView({ selfName }: FamilyTreeViewProps) {
           const coupleRight = Math.max(...parentXs) + NODE_W
           const coupleCenterX = (coupleLeft + coupleRight) / 2
 
-          // Check if there's a spouse edge connecting parents (for stem origin Y)
+          // Stem start: bottom of single parent, or spouse-line midpoint for couple
           const hasSpouseEdge = parentNodes.length > 1
           const stemStartY = hasSpouseEdge
-            ? parentNodes[0].y + NODE_H / 2  // start from spouse line height
-            : parentNodes[0].y + NODE_H       // start from bottom of single parent
+            ? parentNodes[0].y + NODE_H / 2
+            : parentNodes[0].y + NODE_H
 
           const childCenters = childNodes.map(n => n.x + NODE_W / 2)
-          const childBarLeft = Math.min(...childCenters)
-          const childBarRight = Math.max(...childCenters)
-          const firstChildTop = childNodes[0].y  // all children same generation
+          const firstChildTop = Math.min(...childNodes.map(n => n.y))
           const midY = stemStartY + (firstChildTop - stemStartY) / 2
+
+          // Horizontal bar spans from min(coupleCenterX, leftmost child) to max(coupleCenterX, rightmost child)
+          // This guarantees the stem always connects to the bar even if parents are offset from children
+          const barLeft = Math.min(coupleCenterX, Math.min(...childCenters))
+          const barRight = Math.max(coupleCenterX, Math.max(...childCenters))
+          const drawBar = barRight - barLeft > 0.5
 
           return (
             <g key={`fu-${i}`}>
               {/* Vertical stem from couple center down to midY */}
               <line x1={coupleCenterX} y1={stemStartY} x2={coupleCenterX} y2={midY}
                 stroke="#94a3b8" strokeWidth="1.5" />
-              {/* Horizontal bar spanning all children */}
-              {childNodes.length > 1 && (
-                <line x1={childBarLeft} y1={midY} x2={childBarRight} y2={midY}
+              {/* Horizontal bar connecting stem to child drop points (omitted when single child directly below) */}
+              {drawBar && (
+                <line x1={barLeft} y1={midY} x2={barRight} y2={midY}
                   stroke="#94a3b8" strokeWidth="1.5" />
               )}
-              {/* Vertical drop to each child */}
+              {/* Vertical drop from midY to each child top — one line per child, no duplicates */}
               {childNodes.map((child, ci) => {
                 const cx = child.x + NODE_W / 2
-                // If single child with same x as couple center, don't double-draw
-                if (childNodes.length === 1 && Math.abs(cx - coupleCenterX) < 1) {
-                  return null
-                }
                 return (
                   <line key={`fu-${i}-c${ci}`}
                     x1={cx} y1={midY} x2={cx} y2={child.y}
                     stroke="#94a3b8" strokeWidth="1.5" />
                 )
               })}
-              {/* If single child exactly under couple, just continue the stem */}
-              {childNodes.length === 1 && (
-                <line x1={coupleCenterX} y1={midY} x2={childNodes[0].x + NODE_W / 2} y2={childNodes[0].y}
-                  stroke="#94a3b8" strokeWidth="1.5" />
-              )}
             </g>
           )
         })}
