@@ -167,7 +167,7 @@ function layoutTree(
     const nodeIds = genGroups.get(g)!
 
     // Group nodes by their shared parents at the previous generation.
-    // Nodes sharing the same parent(s) form one family group and stay together.
+    // Then merge groups connected by spouse edges so couples always stay together.
     const getParentKey = (nodeId: NodeId): string => {
       const parents = (adj.get(nodeId)?.parents || [])
         .filter(p => generations.get(p) === g - 1 && nodePositions.has(p))
@@ -175,11 +175,52 @@ function layoutTree(
       return parents.length > 0 ? parents.join('|') : `__orphan__${nodeId}`
     }
 
-    const groupMap = new Map<string, NodeId[]>()
+    const initialGroupMap = new Map<string, NodeId[]>()
     for (const nodeId of nodeIds) {
       const key = getParentKey(nodeId)
-      if (!groupMap.has(key)) groupMap.set(key, [])
-      groupMap.get(key)!.push(nodeId)
+      if (!initialGroupMap.has(key)) initialGroupMap.set(key, [])
+      initialGroupMap.get(key)!.push(nodeId)
+    }
+
+    // Merge groups connected by spouse edges using Union-Find
+    // This ensures couples (e.g. self + wife) are always in the same group
+    const nodeToKey = new Map<NodeId, string>()
+    for (const [key, grpNodes] of initialGroupMap) {
+      for (const n of grpNodes) nodeToKey.set(n, key)
+    }
+
+    const ufParent = new Map<string, string>()
+    const ufFind = (k: string): string => {
+      if (!ufParent.has(k)) ufParent.set(k, k)
+      if (ufParent.get(k) !== k) ufParent.set(k, ufFind(ufParent.get(k)!))
+      return ufParent.get(k)!
+    }
+    const ufUnion = (a: string, b: string) => {
+      const ra = ufFind(a), rb = ufFind(b)
+      if (ra !== rb) {
+        // Prefer non-orphan key as root so group keeps meaningful parent reference
+        if (ra.startsWith('__orphan__') && !rb.startsWith('__orphan__')) {
+          ufParent.set(ra, rb)
+        } else {
+          ufParent.set(rb, ra)
+        }
+      }
+    }
+
+    for (const nodeId of nodeIds) {
+      const nk = nodeToKey.get(nodeId)!
+      for (const sp of (adj.get(nodeId)?.spouses ?? [])) {
+        const sk = nodeToKey.get(sp)
+        if (sk && sk !== nk) ufUnion(nk, sk)
+      }
+    }
+
+    // Rebuild groups with merged keys
+    const groupMap = new Map<string, NodeId[]>()
+    for (const [key, grpNodes] of initialGroupMap) {
+      const root = ufFind(key)
+      if (!groupMap.has(root)) groupMap.set(root, [])
+      groupMap.get(root)!.push(...grpNodes)
     }
 
     // Sort groups: non-orphan groups ordered by leftmost parent x, orphans at end
@@ -322,6 +363,30 @@ function layoutTree(
       const shift = parentsCenter - childrenCenter
       if (Math.abs(shift) > 0.5) {
         for (const c of group) nodePositions.get(c)!.x += shift
+      }
+    }
+  }
+
+  // Final overlap resolution: ensure no two nodes in the same generation overlap.
+  // After centering passes, groups may have been shifted into each other.
+  for (const g of sortedGens) {
+    if (!genGroups.has(g)) continue
+    const gNodeIds = genGroups.get(g)!
+    if (gNodeIds.length < 2) continue
+
+    const sorted = [...gNodeIds]
+      .filter(id => nodePositions.has(id))
+      .sort((a, b) => nodePositions.get(a)!.x - nodePositions.get(b)!.x)
+
+    for (let i = 1; i < sorted.length; i++) {
+      const prevPos = nodePositions.get(sorted[i - 1])!
+      const currPos = nodePositions.get(sorted[i])!
+      const isSpouse = (adj.get(sorted[i - 1])?.spouses ?? []).includes(sorted[i])
+      const minGap = isSpouse ? SPOUSE_GAP : H_GAP
+      const minX = prevPos.x + NODE_W + minGap
+
+      if (currPos.x < minX) {
+        currPos.x = minX
       }
     }
   }
