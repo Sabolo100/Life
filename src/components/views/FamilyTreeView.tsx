@@ -12,7 +12,6 @@ const NODE_H = 55
 const H_GAP = 35
 const V_GAP = 95
 const SPOUSE_GAP = 12
-const CONNECTOR_Y_OFFSET = 22 // vertical space for the T-connector between generations
 
 const REL_TYPE_LABELS: Record<FamilyRelType, string> = {
   parent: 'Szülő',
@@ -43,9 +42,15 @@ interface TreeNode {
 }
 
 interface TreeEdge {
-  type: 'parent-child' | 'spouse'
+  type: 'spouse'
   fromId: NodeId
   toId: NodeId
+}
+
+/** One T-connector: one parent couple → all their shared children */
+interface FamilyUnitEdge {
+  parentIds: NodeId[]   // 1 or 2
+  childIds: NodeId[]
 }
 
 // ── Layout algorithm ───────────────────────────────────────────────────────
@@ -88,6 +93,27 @@ function buildAdjacency(relationships: FamilyRelationship[]) {
     }
   }
 
+  // Propagate parents through sibling chains:
+  // If A is sibling of B, and B has parents [P1, P2], then A is also child of P1 and P2.
+  // Run until stable (handles transitive siblings).
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const [nodeId, nodeAdj] of adj) {
+      for (const sibId of nodeAdj.siblings) {
+        const sibAdj = adj.get(sibId)
+        if (!sibAdj) continue
+        for (const parentId of sibAdj.parents) {
+          if (!nodeAdj.parents.includes(parentId)) {
+            nodeAdj.parents.push(parentId)
+            adj.get(parentId)?.children.push(nodeId)
+            changed = true
+          }
+        }
+      }
+    }
+  }
+
   return adj
 }
 
@@ -124,8 +150,7 @@ function layoutTree(
   generations: Map<NodeId, number>,
   personsMap: Map<string, Person>,
   selfName: string,
-): { nodes: TreeNode[]; edges: TreeEdge[] } {
-  // Group by generation
+): { nodes: TreeNode[]; edges: TreeEdge[]; familyUnits: FamilyUnitEdge[] } {
   const genGroups = new Map<number, NodeId[]>()
   for (const [id, g] of generations) {
     if (!genGroups.has(g)) genGroups.set(g, [])
@@ -134,94 +159,121 @@ function layoutTree(
 
   const sortedGens = [...genGroups.keys()].sort((a, b) => a - b)
   const minGen = sortedGens[0] ?? 0
+  const FAMILY_GAP = 55 // extra gap between unrelated family groups in same generation
 
-  // Position nodes per generation
   const nodePositions = new Map<NodeId, { x: number; y: number }>()
 
   for (const g of sortedGens) {
     const nodeIds = genGroups.get(g)!
-    // Group spouses together
-    const placed = new Set<NodeId>()
-    const units: NodeId[][] = []
 
+    // Group nodes by their shared parents at the previous generation.
+    // Nodes sharing the same parent(s) form one family group and stay together.
+    const getParentKey = (nodeId: NodeId): string => {
+      const parents = (adj.get(nodeId)?.parents || [])
+        .filter(p => generations.get(p) === g - 1 && nodePositions.has(p))
+        .sort()
+      return parents.length > 0 ? parents.join('|') : `__orphan__${nodeId}`
+    }
+
+    const groupMap = new Map<string, NodeId[]>()
     for (const nodeId of nodeIds) {
-      if (placed.has(nodeId)) continue
-      placed.add(nodeId)
-      const unit = [nodeId]
-      const spouses = adj.get(nodeId)?.spouses || []
-      for (const s of spouses) {
-        if (generations.get(s) === g && !placed.has(s)) {
-          unit.push(s)
-          placed.add(s)
+      const key = getParentKey(nodeId)
+      if (!groupMap.has(key)) groupMap.set(key, [])
+      groupMap.get(key)!.push(nodeId)
+    }
+
+    // Sort groups: non-orphan groups ordered by leftmost parent x, orphans at end
+    const nonOrphan: Array<[string, NodeId[]]> = []
+    const orphan: Array<[string, NodeId[]]> = []
+    for (const entry of groupMap) {
+      (entry[0].startsWith('__orphan__') ? orphan : nonOrphan).push(entry)
+    }
+    nonOrphan.sort(([keyA], [keyB]) => {
+      const xA = Math.min(...keyA.split('|').map(p => nodePositions.get(p)?.x ?? 0))
+      const xB = Math.min(...keyB.split('|').map(p => nodePositions.get(p)?.x ?? 0))
+      return xA - xB
+    })
+    const allGroups = [...nonOrphan, ...orphan]
+
+    // Layout each group left-to-right; spouses adjacent within group
+    let x = 0
+    for (let gi = 0; gi < allGroups.length; gi++) {
+      const groupNodes = allGroups[gi][1]
+      const placed = new Set<NodeId>()
+      const arranged: NodeId[] = []
+
+      for (const nodeId of groupNodes) {
+        if (placed.has(nodeId)) continue
+        placed.add(nodeId)
+        arranged.push(nodeId)
+        for (const s of adj.get(nodeId)?.spouses || []) {
+          if (generations.get(s) === g && groupNodes.includes(s) && !placed.has(s)) {
+            placed.add(s)
+            arranged.push(s)
+          }
         }
       }
-      units.push(unit)
-    }
 
-    // Position units left to right
-    let x = 0
-    for (const unit of units) {
-      for (let i = 0; i < unit.length; i++) {
-        nodePositions.set(unit[i], {
-          x: x + i * (NODE_W + SPOUSE_GAP),
-          y: (g - minGen) * (NODE_H + V_GAP),
-        })
+      for (let i = 0; i < arranged.length; i++) {
+        const nodeId = arranged[i]
+        const prevId = i > 0 ? arranged[i - 1] : null
+        const isSpouseOfPrev = prevId && (adj.get(prevId)?.spouses || []).includes(nodeId)
+        if (i > 0) x += isSpouseOfPrev ? SPOUSE_GAP : H_GAP
+        nodePositions.set(nodeId, { x, y: (g - minGen) * (NODE_H + V_GAP) })
+        x += NODE_W
       }
-      x += unit.length * NODE_W + (unit.length - 1) * SPOUSE_GAP + H_GAP
+
+      if (gi < allGroups.length - 1) x += FAMILY_GAP
     }
 
-    // Center the generation at x=0
+    // Center this generation at x=0
     const allXs = nodeIds.map(id => nodePositions.get(id)!.x)
-    const totalWidth = Math.max(...allXs) + NODE_W - Math.min(...allXs)
-    const offset = -totalWidth / 2
-    for (const id of nodeIds) {
-      nodePositions.get(id)!.x += offset
-    }
+    const minX = Math.min(...allXs)
+    const maxX = Math.max(...allXs) + NODE_W
+    const offset = -((minX + maxX) / 2)
+    for (const id of nodeIds) nodePositions.get(id)!.x += offset
   }
 
-  // Centering pass: center children under their parents
+  // Centering pass: shift each PARENT COUPLE to center over their children.
+  // We shift parents, never children, so siblings always stay together.
+  const processedCouples = new Set<NodeId>()
   for (const g of sortedGens) {
     const nodeIds = genGroups.get(g)!
     for (const nodeId of nodeIds) {
-      const children = adj.get(nodeId)?.children || []
-      const positionedChildren = children.filter(c => nodePositions.has(c))
-      if (positionedChildren.length === 0) continue
+      if (processedCouples.has(nodeId)) continue
 
-      // Find center of children
-      const childXs = positionedChildren.map(c => nodePositions.get(c)!.x + NODE_W / 2)
-      const childCenter = (Math.min(...childXs) + Math.max(...childXs)) / 2
+      const nextGen = g + 1
+      const directChildren = (adj.get(nodeId)?.children || [])
+        .filter(c => nodePositions.has(c) && generations.get(c) === nextGen)
+      if (directChildren.length === 0) continue
 
-      // Find parent center (including spouse)
-      const parentPos = nodePositions.get(nodeId)!
-      const spouses = (adj.get(nodeId)?.spouses || []).filter(s => generations.get(s) === g)
-      let parentCenter: number
-      if (spouses.length > 0 && nodePositions.has(spouses[0])) {
-        const spousePos = nodePositions.get(spouses[0])!
-        parentCenter = (Math.min(parentPos.x, spousePos.x) + Math.max(parentPos.x, spousePos.x) + NODE_W) / 2
-      } else {
-        parentCenter = parentPos.x + NODE_W / 2
+      const spouses = (adj.get(nodeId)?.spouses || [])
+        .filter(s => generations.get(s) === g && nodePositions.has(s))
+      processedCouples.add(nodeId)
+      for (const s of spouses) processedCouples.add(s)
+
+      // All children of this couple (union)
+      const allChildren = new Set(directChildren)
+      for (const s of spouses) {
+        for (const c of adj.get(s)?.children || []) {
+          if (nodePositions.has(c) && generations.get(c) === nextGen) allChildren.add(c)
+        }
       }
 
-      // Shift children to center under parents
-      const shift = parentCenter - childCenter
-      for (const c of positionedChildren) {
-        nodePositions.get(c)!.x += shift
-        // Also shift the children's spouses
-        const cSpouses = (adj.get(c)?.spouses || []).filter(s => generations.get(s) === generations.get(c))
-        for (const cs of cSpouses) {
-          if (nodePositions.has(cs)) nodePositions.get(cs)!.x += shift
-        }
+      const childXs = [...allChildren].map(c => nodePositions.get(c)!.x + NODE_W / 2)
+      const childrenCenter = (Math.min(...childXs) + Math.max(...childXs)) / 2
+
+      const parentXs = [nodeId, ...spouses].map(p => nodePositions.get(p)!.x)
+      const coupleCenter = (Math.min(...parentXs) + Math.max(...parentXs) + NODE_W) / 2
+
+      const shift = childrenCenter - coupleCenter
+      if (Math.abs(shift) > 0.5) {
+        for (const p of [nodeId, ...spouses]) nodePositions.get(p)!.x += shift
       }
     }
   }
 
   // Build nodes
-  const getRelLabel = (id: NodeId): string => {
-    if (id === 'self') return ''
-    const person = personsMap.get(id)
-    return person?.relationship_type || ''
-  }
-
   const nodes: TreeNode[] = []
   for (const [id, pos] of nodePositions) {
     const person = id === 'self' ? null : personsMap.get(id) ?? null
@@ -229,41 +281,63 @@ function layoutTree(
       id,
       person,
       name: id === 'self' ? selfName : (person?.name || '?'),
-      relLabel: getRelLabel(id),
+      relLabel: id === 'self' ? '' : (person?.relationship_type || ''),
       generation: generations.get(id) ?? 0,
       x: pos.x,
       y: pos.y,
     })
   }
 
-  // Build edges
+  // Build spouse edges only (parent-child connections use family unit T-connectors)
   const edges: TreeEdge[] = []
-  const edgeSet = new Set<string>()
-
+  const spouseSet = new Set<string>()
   for (const [nodeId, neighbors] of adj) {
     if (!nodePositions.has(nodeId)) continue
-
-    for (const childId of neighbors.children) {
-      if (!nodePositions.has(childId)) continue
-      const key = `pc:${nodeId}:${childId}`
-      if (!edgeSet.has(key)) {
-        edgeSet.add(key)
-        edges.push({ type: 'parent-child', fromId: nodeId, toId: childId })
-      }
-    }
-
     for (const spouseId of neighbors.spouses) {
       if (!nodePositions.has(spouseId)) continue
-      const key1 = `sp:${nodeId}:${spouseId}`
-      const key2 = `sp:${spouseId}:${nodeId}`
-      if (!edgeSet.has(key1) && !edgeSet.has(key2)) {
-        edgeSet.add(key1)
+      const key1 = `${nodeId}:${spouseId}`, key2 = `${spouseId}:${nodeId}`
+      if (!spouseSet.has(key1) && !spouseSet.has(key2)) {
+        spouseSet.add(key1)
         edges.push({ type: 'spouse', fromId: nodeId, toId: spouseId })
       }
     }
   }
 
-  return { nodes, edges }
+  // Build family unit T-connectors
+  // One FamilyUnitEdge per unique parent-couple → children group
+  const familyUnits: FamilyUnitEdge[] = []
+  const fuSet = new Set<string>()
+  for (const [nodeId, neighbors] of adj) {
+    if (!nodePositions.has(nodeId)) continue
+    const g = generations.get(nodeId)!
+    const children = neighbors.children.filter(c => nodePositions.has(c))
+    if (children.length === 0) continue
+
+    const spouses = neighbors.spouses.filter(s => generations.get(s) === g && nodePositions.has(s))
+    // Find the spouse that shares children (prefer shared-children spouse)
+    let partner: NodeId | null = null
+    for (const s of spouses) {
+      if ((adj.get(s)?.children || []).some(c => children.includes(c))) { partner = s; break }
+    }
+
+    const fuKey = partner ? [nodeId, partner].sort().join('||') : nodeId
+    if (fuSet.has(fuKey)) continue
+    fuSet.add(fuKey)
+
+    const allChildren = new Set(children)
+    if (partner) {
+      for (const c of adj.get(partner)?.children || []) {
+        if (nodePositions.has(c)) allChildren.add(c)
+      }
+    }
+
+    familyUnits.push({
+      parentIds: partner ? [nodeId, partner] : [nodeId],
+      childIds: [...allChildren],
+    })
+  }
+
+  return { nodes, edges, familyUnits }
 }
 
 // ── Auto-import helper ─────────────────────────────────────────────────────
@@ -361,9 +435,9 @@ export function FamilyTreeView({ selfName }: FamilyTreeViewProps) {
   }, [persons])
 
   // Build tree layout
-  const { nodes, edges } = useMemo(() => {
+  const { nodes, edges, familyUnits } = useMemo(() => {
     if (familyRelationships.length === 0) {
-      return { nodes: [], edges: [] }
+      return { nodes: [], edges: [], familyUnits: [] }
     }
     const adj = buildAdjacency(familyRelationships)
     const generations = assignGenerations(adj)
@@ -642,44 +716,74 @@ export function FamilyTreeView({ selfName }: FamilyTreeViewProps) {
           </filter>
         </defs>
 
-        {/* Edges */}
+        {/* Spouse edges */}
         {edges.map((edge, i) => {
           const from = nodeMap.get(edge.fromId)
           const to = nodeMap.get(edge.toId)
           if (!from || !to) return null
+          const y = from.y + NODE_H / 2
+          const x1 = Math.min(from.x, to.x) + NODE_W
+          const x2 = Math.max(from.x, to.x)
+          return (
+            <g key={`sp-${i}`}>
+              <line x1={x1} y1={y} x2={x2} y2={y} stroke="#e11d48" strokeWidth="2" />
+              <text x={(x1 + x2) / 2} y={y - 3} textAnchor="middle" fontSize="8" fill="#e11d48">&#9829;</text>
+            </g>
+          )
+        })}
 
-          if (edge.type === 'spouse') {
-            // Horizontal line connecting spouses at mid-height
-            const y = from.y + NODE_H / 2
-            const x1 = Math.min(from.x, to.x) + NODE_W
-            const x2 = Math.max(from.x, to.x)
-            return (
-              <g key={`edge-${i}`}>
-                <line x1={x1} y1={y} x2={x2} y2={y} stroke="#e11d48" strokeWidth="2" />
-                {/* Small heart */}
-                <text x={(x1 + x2) / 2} y={y - 3} textAnchor="middle" fontSize="8" fill="#e11d48">&#9829;</text>
-              </g>
-            )
-          }
+        {/* Family unit T-connectors: one stem from couple center to all children */}
+        {familyUnits.map((fu, i) => {
+          const parentNodes = fu.parentIds.map(id => nodeMap.get(id)).filter(Boolean) as TreeNode[]
+          const childNodes = fu.childIds.map(id => nodeMap.get(id)).filter(Boolean) as TreeNode[]
+          if (parentNodes.length === 0 || childNodes.length === 0) return null
 
-          // Parent-child: T-connector
-          const parentCenterX = from.x + NODE_W / 2
-          const parentBottomY = from.y + NODE_H
-          const childCenterX = to.x + NODE_W / 2
-          const childTopY = to.y
-          const midY = parentBottomY + CONNECTOR_Y_OFFSET
+          // Couple center x = midpoint between leftmost and rightmost parent (including node width)
+          const parentXs = parentNodes.map(n => n.x)
+          const coupleLeft = Math.min(...parentXs)
+          const coupleRight = Math.max(...parentXs) + NODE_W
+          const coupleCenterX = (coupleLeft + coupleRight) / 2
+
+          // Check if there's a spouse edge connecting parents (for stem origin Y)
+          const hasSpouseEdge = parentNodes.length > 1
+          const stemStartY = hasSpouseEdge
+            ? parentNodes[0].y + NODE_H / 2  // start from spouse line height
+            : parentNodes[0].y + NODE_H       // start from bottom of single parent
+
+          const childCenters = childNodes.map(n => n.x + NODE_W / 2)
+          const childBarLeft = Math.min(...childCenters)
+          const childBarRight = Math.max(...childCenters)
+          const firstChildTop = childNodes[0].y  // all children same generation
+          const midY = stemStartY + (firstChildTop - stemStartY) / 2
 
           return (
-            <g key={`edge-${i}`}>
-              {/* Vertical from parent bottom to mid */}
-              <line x1={parentCenterX} y1={parentBottomY} x2={parentCenterX} y2={midY}
+            <g key={`fu-${i}`}>
+              {/* Vertical stem from couple center down to midY */}
+              <line x1={coupleCenterX} y1={stemStartY} x2={coupleCenterX} y2={midY}
                 stroke="#94a3b8" strokeWidth="1.5" />
-              {/* Horizontal to child x */}
-              <line x1={parentCenterX} y1={midY} x2={childCenterX} y2={midY}
-                stroke="#94a3b8" strokeWidth="1.5" />
-              {/* Vertical from mid to child top */}
-              <line x1={childCenterX} y1={midY} x2={childCenterX} y2={childTopY}
-                stroke="#94a3b8" strokeWidth="1.5" />
+              {/* Horizontal bar spanning all children */}
+              {childNodes.length > 1 && (
+                <line x1={childBarLeft} y1={midY} x2={childBarRight} y2={midY}
+                  stroke="#94a3b8" strokeWidth="1.5" />
+              )}
+              {/* Vertical drop to each child */}
+              {childNodes.map((child, ci) => {
+                const cx = child.x + NODE_W / 2
+                // If single child with same x as couple center, don't double-draw
+                if (childNodes.length === 1 && Math.abs(cx - coupleCenterX) < 1) {
+                  return null
+                }
+                return (
+                  <line key={`fu-${i}-c${ci}`}
+                    x1={cx} y1={midY} x2={cx} y2={child.y}
+                    stroke="#94a3b8" strokeWidth="1.5" />
+                )
+              })}
+              {/* If single child exactly under couple, just continue the stem */}
+              {childNodes.length === 1 && (
+                <line x1={coupleCenterX} y1={midY} x2={childNodes[0].x + NODE_W / 2} y2={childNodes[0].y}
+                  stroke="#94a3b8" strokeWidth="1.5" />
+              )}
             </g>
           )
         })}
