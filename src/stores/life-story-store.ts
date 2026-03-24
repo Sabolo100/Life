@@ -26,6 +26,7 @@ interface LifeStoryState {
   confirmLocation: (locationId: string) => Promise<void>
   updateLocationCoordinates: (locationId: string, coordinates: { lat: number; lng: number }) => Promise<void>
   addFamilyRelationship: (fromPersonId: string | null, toPersonId: string | null, type: FamilyRelType) => Promise<void>
+  batchAddFamilyRelationships: (entries: { fromPersonId: string | null; toPersonId: string | null; type: FamilyRelType }[]) => Promise<void>
   removeFamilyRelationship: (id: string) => Promise<void>
 }
 
@@ -221,6 +222,22 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
       .eq('status', 'open')
       .order('priority', { ascending: false })
     set({ openQuestions: (data as OpenQuestion[]) || [] })
+  },
+
+  batchAddFamilyRelationships: async (entries) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user || entries.length === 0) return
+    const rows = entries.map(e => ({
+      user_id: user.id,
+      from_person_id: e.fromPersonId,
+      to_person_id: e.toPersonId,
+      relationship_type: e.type,
+    }))
+    const { data, error } = await supabase.from('family_relationships').insert(rows).select()
+    if (error) { console.error('[batchAddFamilyRelationships] error:', error); return }
+    if (data) {
+      set(state => ({ familyRelationships: [...state.familyRelationships, ...(data as FamilyRelationship[])] }))
+    }
   },
 
   addFamilyRelationship: async (fromPersonId, toPersonId, type) => {

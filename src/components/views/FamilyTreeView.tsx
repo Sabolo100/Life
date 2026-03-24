@@ -51,10 +51,10 @@ interface TreeEdge {
 // ── Layout algorithm ───────────────────────────────────────────────────────
 
 function buildAdjacency(relationships: FamilyRelationship[]) {
-  const adj = new Map<NodeId, { parents: NodeId[]; children: NodeId[]; spouses: NodeId[] }>()
+  const adj = new Map<NodeId, { parents: NodeId[]; children: NodeId[]; spouses: NodeId[]; siblings: NodeId[] }>()
 
   const ensure = (id: NodeId) => {
-    if (!adj.has(id)) adj.set(id, { parents: [], children: [], spouses: [] })
+    if (!adj.has(id)) adj.set(id, { parents: [], children: [], spouses: [], siblings: [] })
     return adj.get(id)!
   }
 
@@ -82,18 +82,10 @@ function buildAdjacency(relationships: FamilyRelationship[]) {
         if (!toAdj.spouses.includes(fromId)) toAdj.spouses.push(fromId)
         break
       case 'sibling':
-        // Siblings share same generation - treat as peer
+        if (!fromAdj.siblings.includes(toId)) fromAdj.siblings.push(toId)
+        if (!toAdj.siblings.includes(fromId)) toAdj.siblings.push(fromId)
         break
     }
-  }
-
-  // Handle siblings: they share the same parents but might not have explicit parent records
-  for (const rel of relationships) {
-    if (rel.relationship_type !== 'sibling') continue
-    const fromId: NodeId = rel.from_person_id ?? 'self'
-    const toId: NodeId = rel.to_person_id ?? 'self'
-    ensure(fromId)
-    ensure(toId)
   }
 
   return adj
@@ -119,10 +111,11 @@ function assignGenerations(adj: ReturnType<typeof buildAdjacency>): Map<NodeId, 
     for (const s of neighbors.spouses) {
       if (!gen.has(s)) { gen.set(s, g); queue.push(s) }
     }
+    for (const sib of neighbors.siblings) {
+      if (!gen.has(sib)) { gen.set(sib, g); queue.push(sib) }
+    }
   }
 
-  // Add siblings from sibling relationships that weren't reached
-  // (siblings without shared parents get same gen as their sibling partner)
   return gen
 }
 
@@ -273,6 +266,48 @@ function layoutTree(
   return { nodes, edges }
 }
 
+// ── Auto-import helper ─────────────────────────────────────────────────────
+
+/**
+ * Maps a person's relationship_type string to a FamilyRelType + direction.
+ * Returns null if the type is not a direct family relationship.
+ * Direction: 'to_is_person' means from=self(null), to=person.id
+ *            'from_is_person' means from=person.id, to=self(null)
+ */
+function inferFamilyRelFromType(relType: string): {
+  type: FamilyRelType
+  direction: 'to_is_person' | 'from_is_person'
+} | null {
+  const t = relType.toLowerCase().trim()
+
+  // Parents (person is parent of self → "to" is parent of "from=self")
+  const parentKeywords = ['anya', 'édesanya', 'apa', 'édesapa', 'mostohaanya', 'mostohaapa',
+    'nevelőanya', 'nevelőapa', 'mama', 'papa', 'tata', 'anyám', 'apám']
+  if (parentKeywords.some(k => t === k || t.includes(k))) {
+    return { type: 'parent', direction: 'to_is_person' }
+  }
+
+  // Children (person is child of self)
+  const childKeywords = ['gyerek', 'gyermek', 'fiam', 'lányom', 'fiú', 'leány']
+  if (childKeywords.some(k => t === k || t.includes(k))) {
+    return { type: 'child', direction: 'to_is_person' }
+  }
+
+  // Spouse
+  const spouseKeywords = ['házastárs', 'feleség', 'férj', 'élettárs', 'pár', 'menyasszony', 'vőlegény']
+  if (spouseKeywords.some(k => t === k || t.includes(k))) {
+    return { type: 'spouse', direction: 'to_is_person' }
+  }
+
+  // Siblings
+  const siblingKeywords = ['testvér', 'nővér', 'báty', 'bátya', 'öcs', 'öcsém', 'húg', 'hugom', 'fivér', 'nénjem']
+  if (siblingKeywords.some(k => t === k || t.includes(k))) {
+    return { type: 'sibling', direction: 'to_is_person' }
+  }
+
+  return null
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 interface FamilyTreeViewProps {
@@ -280,12 +315,37 @@ interface FamilyTreeViewProps {
 }
 
 export function FamilyTreeView({ selfName }: FamilyTreeViewProps) {
-  const { persons, familyRelationships, addFamilyRelationship, removeFamilyRelationship } = useLifeStoryStore()
+  const { persons, familyRelationships, addFamilyRelationship, batchAddFamilyRelationships, removeFamilyRelationship } = useLifeStoryStore()
 
   const [selectedNodeId, setSelectedNodeId] = useState<NodeId | null>(null)
   const [addingRel, setAddingRel] = useState(false)
   const [newRelType, setNewRelType] = useState<FamilyRelType>('parent')
   const [newRelPersonId, setNewRelPersonId] = useState<string>('')
+  const [importing, setImporting] = useState(false)
+
+  // Detect persons that can be auto-imported
+  const importCandidates = useMemo(() => {
+    if (familyRelationships.length > 0) return []
+    return persons
+      .map(p => {
+        const inferred = inferFamilyRelFromType(p.relationship_type)
+        if (!inferred) return null
+        return { person: p, ...inferred }
+      })
+      .filter(Boolean) as Array<{ person: Person; type: FamilyRelType; direction: 'to_is_person' | 'from_is_person' }>
+  }, [persons, familyRelationships])
+
+  const handleAutoImport = async () => {
+    if (importCandidates.length === 0) return
+    setImporting(true)
+    const entries = importCandidates.map(c => ({
+      fromPersonId: c.direction === 'from_is_person' ? c.person.id : null,
+      toPersonId: c.direction === 'to_is_person' ? c.person.id : null,
+      type: c.type,
+    }))
+    await batchAddFamilyRelationships(entries)
+    setImporting(false)
+  }
 
   // Zoom / pan
   const [zoom, setZoom] = useState(1)
@@ -429,20 +489,103 @@ export function FamilyTreeView({ selfName }: FamilyTreeViewProps) {
 
   if (familyRelationships.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="text-center space-y-4 max-w-sm">
-          <Users className="w-14 h-14 mx-auto text-muted-foreground/40" />
-          <h3 className="text-lg font-medium text-muted-foreground">A családfád még üres</h3>
-          <p className="text-sm text-muted-foreground/70">
-            Kattints az alábbi gombra, hogy elkezdhesd felépíteni a családfádat.
-            Válaszd ki az első rokoni kapcsolatot!
-          </p>
-          <Button
-            onClick={() => { setSelectedNodeId('self'); setAddingRel(true) }}
-            className="gap-2"
-          >
-            <Plus className="w-4 h-4" /> Első kapcsolat hozzáadása
-          </Button>
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-md mx-auto space-y-5">
+          <div className="text-center space-y-2">
+            <Users className="w-12 h-12 mx-auto text-muted-foreground/40" />
+            <h3 className="text-lg font-semibold">A családfád még üres</h3>
+            <p className="text-sm text-muted-foreground">
+              Kapcsolati hálóból a következő személyek importálhatók automatikusan:
+            </p>
+          </div>
+
+          {importCandidates.length > 0 ? (
+            <>
+              <div className="border rounded-xl divide-y overflow-hidden">
+                {importCandidates.map(({ person, type }) => (
+                  <div key={person.id} className="flex items-center justify-between px-4 py-3 bg-card">
+                    <div>
+                      <span className="text-sm font-medium">{person.name}</span>
+                      <span className="text-xs text-muted-foreground ml-2">({person.relationship_type})</span>
+                    </div>
+                    <Badge variant="secondary" className="text-xs">
+                      {REL_TYPE_LABELS[type]}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+              <Button
+                className="w-full gap-2"
+                disabled={importing}
+                onClick={handleAutoImport}
+              >
+                {importing ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    Importálás...
+                  </span>
+                ) : (
+                  <><Plus className="w-4 h-4" /> {importCandidates.length} személy importálása</>
+                )}
+              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Nagyszülők, sógorok és egyéb távolabbi rokonok a fa megnyitása után adhatók hozzá kézzel.
+              </p>
+            </>
+          ) : (
+            <div className="text-center space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Még nincsenek felismert közvetlen hozzátartozók.
+              </p>
+            </div>
+          )}
+
+          <div className="border-t pt-4 space-y-2">
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => { setSelectedNodeId('self'); setAddingRel(true) }}
+            >
+              <Plus className="w-4 h-4" /> Kapcsolat kézi hozzáadása
+            </Button>
+
+            {/* Inline add panel when triggered from empty state */}
+            {selectedNodeId === 'self' && addingRel && (
+              <div className="border rounded-xl p-4 space-y-2 bg-card">
+                <p className="text-xs font-medium text-muted-foreground">Én kapcsolata:</p>
+                <div className="flex gap-2">
+                  <select
+                    value={newRelType}
+                    onChange={e => setNewRelType(e.target.value as FamilyRelType)}
+                    className="flex-1 text-sm border rounded px-2 py-1.5 bg-background"
+                  >
+                    <option value="parent">Szülőm</option>
+                    <option value="child">Gyerekem</option>
+                    <option value="spouse">Házastársam</option>
+                    <option value="sibling">Testvérem</option>
+                  </select>
+                </div>
+                <select
+                  value={newRelPersonId}
+                  onChange={e => setNewRelPersonId(e.target.value)}
+                  className="w-full text-sm border rounded px-2 py-1.5 bg-background"
+                >
+                  <option value="">Válassz személyt...</option>
+                  {persons.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.relationship_type})</option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <Button size="sm" className="flex-1 text-xs" disabled={!newRelPersonId} onClick={handleAddRelationship}>
+                    Hozzáadás
+                  </Button>
+                  <Button size="sm" variant="ghost" className="text-xs" onClick={() => { setAddingRel(false); setSelectedNodeId(null) }}>
+                    Mégse
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     )
