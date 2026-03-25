@@ -366,10 +366,25 @@ export function TimelineView({ onBack }: TimelineViewProps) {
 
   // ── Derived layout values ─────────────────────────────────────────────────
 
-  const visibleTracks = activeTracks.filter(t => !collapsedTracks.has(t.id))
+  const COLLAPSED_HEIGHT = 18 // thin strip for collapsed tracks
   const svgWidth = totalYears * YEAR_WIDTH + LABEL_WIDTH + 20
-  const svgHeight = RULER_HEIGHT + visibleTracks.length * (TRACK_HEIGHT + TRACK_GAP) + 20
-  const collapsedCount = collapsedTracks.size
+
+  // Compute Y offset for each track (collapsed tracks get thin height)
+  const trackLayout = useMemo(() => {
+    const layout: { track: TrackDef; y: number; height: number; collapsed: boolean }[] = []
+    let y = RULER_HEIGHT
+    for (const track of activeTracks) {
+      const collapsed = collapsedTracks.has(track.id)
+      const h = collapsed ? COLLAPSED_HEIGHT : TRACK_HEIGHT
+      layout.push({ track, y, height: h, collapsed })
+      y += h + TRACK_GAP
+    }
+    return layout
+  }, [activeTracks, collapsedTracks])
+
+  const svgHeight = (trackLayout.length > 0
+    ? trackLayout[trackLayout.length - 1].y + trackLayout[trackLayout.length - 1].height
+    : RULER_HEIGHT) + 20
 
   // ── X position helper ─────────────────────────────────────────────────────
 
@@ -505,9 +520,36 @@ export function TimelineView({ onBack }: TimelineViewProps) {
           </g>
 
           {/* ─── Tracks ─── */}
-          {visibleTracks.map((track, trackIdx) => {
-            const trackY = RULER_HEIGHT + trackIdx * (TRACK_HEIGHT + TRACK_GAP)
+          {trackLayout.map(({ track, y: trackY, height: trackH, collapsed }) => {
             const trackEvents = placedEvents.filter(pe => pe.trackId === track.id)
+
+            // ── Collapsed track: thin clickable strip ──
+            if (collapsed) {
+              return (
+                <g key={track.id} className="cursor-pointer" onClick={() => toggleTrack(track.id)}>
+                  <rect x={0} y={trackY} width={svgWidth} height={trackH}
+                    fill={track.bgFill} opacity={0.3} />
+                  <rect x={0} y={trackY} width={LABEL_WIDTH} height={trackH}
+                    fill="white" stroke="#e2e8f0" strokeWidth={0.5} />
+                  <text x={9} y={trackY + trackH / 2 + 3.5} textAnchor="middle"
+                    fontSize={8} fill="#94a3b8">▸</text>
+                  <text x={22} y={trackY + trackH / 2 + 3.5}
+                    fontSize={9} fill={track.fill} fontWeight={500} opacity={0.6}>
+                    {track.label}
+                  </text>
+                  {trackEvents.length > 0 && (
+                    <text x={LABEL_WIDTH - 8} y={trackY + trackH / 2 + 3}
+                      textAnchor="end" fontSize={8} fill="#94a3b8">
+                      {trackEvents.length}
+                    </text>
+                  )}
+                  <line x1={0} y1={trackY + trackH} x2={svgWidth} y2={trackY + trackH}
+                    stroke="#e2e8f0" strokeWidth={0.5} />
+                </g>
+              )
+            }
+
+            // ── Expanded track ──
 
             // Lane assignment within this track to avoid overlap
             const lanes: PlacedEvent[][] = []
@@ -524,58 +566,44 @@ export function TimelineView({ onBack }: TimelineViewProps) {
               if (!placed) lanes.push([pe])
             }
 
-            const subTrackH = TRACK_HEIGHT / Math.max(1, lanes.length)
+            const subTrackH = trackH / Math.max(1, lanes.length)
 
             return (
               <g key={track.id}>
                 {/* Track background */}
-                <rect
-                  x={0} y={trackY}
-                  width={svgWidth} height={TRACK_HEIGHT}
-                  fill={track.bgFill} opacity={0.5}
-                />
+                <rect x={0} y={trackY} width={svgWidth} height={trackH}
+                  fill={track.bgFill} opacity={0.5} />
 
                 {/* Track label (sticky left) */}
-                <rect x={0} y={trackY} width={LABEL_WIDTH} height={TRACK_HEIGHT}
+                <rect x={0} y={trackY} width={LABEL_WIDTH} height={trackH}
                   fill="white" stroke="#e2e8f0" strokeWidth={0.5} />
-                <text
-                  x={24} y={trackY + TRACK_HEIGHT / 2 + 4}
-                  fontSize={11} fontWeight={600} fill={track.fill}
-                >
+                <text x={24} y={trackY + trackH / 2 + 4}
+                  fontSize={11} fontWeight={600} fill={track.fill}>
                   {track.label}
                 </text>
                 {trackEvents.length > 0 && (
-                  <text
-                    x={LABEL_WIDTH - 8} y={trackY + TRACK_HEIGHT / 2 + 3}
-                    textAnchor="end" fontSize={9} fill="#94a3b8"
-                  >
+                  <text x={LABEL_WIDTH - 8} y={trackY + trackH / 2 + 3}
+                    textAnchor="end" fontSize={9} fill="#94a3b8">
                     {trackEvents.length}
                   </text>
                 )}
 
                 {/* Collapse/expand toggle */}
-                <g
-                  className="cursor-pointer"
-                  onClick={() => toggleTrack(track.id)}
-                >
-                  <rect x={2} y={trackY + TRACK_HEIGHT / 2 - 6} width={14} height={12}
+                <g className="cursor-pointer" onClick={() => toggleTrack(track.id)}>
+                  <rect x={2} y={trackY + trackH / 2 - 6} width={14} height={12}
                     fill="transparent" />
-                  <text x={9} y={trackY + TRACK_HEIGHT / 2 + 4} textAnchor="middle"
-                    fontSize={10} fill="#94a3b8">
-                    {'▸'}
-                  </text>
+                  <text x={9} y={trackY + trackH / 2 + 4} textAnchor="middle"
+                    fontSize={10} fill="#94a3b8">▾</text>
                 </g>
 
                 {/* Track bottom border */}
-                <line x1={0} y1={trackY + TRACK_HEIGHT} x2={svgWidth} y2={trackY + TRACK_HEIGHT}
+                <line x1={0} y1={trackY + trackH} x2={svgWidth} y2={trackY + trackH}
                   stroke="#e2e8f0" strokeWidth={0.5} />
 
                 {/* Empty track hint */}
                 {trackEvents.length === 0 && (
-                  <text
-                    x={LABEL_WIDTH + 16} y={trackY + TRACK_HEIGHT / 2 + 4}
-                    fontSize={11} fill="#cbd5e1" fontStyle="italic"
-                  >
+                  <text x={LABEL_WIDTH + 16} y={trackY + trackH / 2 + 4}
+                    fontSize={11} fill="#cbd5e1" fontStyle="italic">
                     Mesélj az AI-nak erről a témáról...
                   </text>
                 )}
@@ -604,7 +632,6 @@ export function TimelineView({ onBack }: TimelineViewProps) {
                             setPopupPos(null)
                           } else {
                             setSelectedEvent(pe.event)
-                            // Position popup relative to scroll container
                             const container = scrollRef.current
                             if (container) {
                               const rect = container.getBoundingClientRect()
@@ -616,41 +643,25 @@ export function TimelineView({ onBack }: TimelineViewProps) {
                           }
                         }}
                       >
-                        {/* Block rectangle */}
-                        <rect
-                          x={x1} y={blockY}
-                          width={blockW} height={blockH}
-                          rx={4}
-                          fill={track.fill}
+                        <rect x={x1} y={blockY} width={blockW} height={blockH}
+                          rx={4} fill={track.fill}
                           opacity={isSelected ? 1 : 0.75}
                           stroke={isSelected ? track.borderFill : 'transparent'}
-                          strokeWidth={isSelected ? 2 : 0}
-                        />
+                          strokeWidth={isSelected ? 2 : 0} />
 
-                        {/* Turning point star */}
                         {isTurning && (
-                          <text
-                            x={x1 + 3} y={blockY + blockH / 2 + 3.5}
-                            fontSize={10} fill="white"
-                          >
-                            ★
-                          </text>
+                          <text x={x1 + 3} y={blockY + blockH / 2 + 3.5}
+                            fontSize={10} fill="white">★</text>
                         )}
 
-                        {/* Title text inside block (only if wide enough) */}
                         {blockW > 40 && (
                           <foreignObject
                             x={x1 + (isTurning ? 14 : 4)} y={blockY + 1}
-                            width={blockW - (isTurning ? 18 : 8)} height={blockH - 2}
-                          >
+                            width={blockW - (isTurning ? 18 : 8)} height={blockH - 2}>
                             <div style={{
-                              fontSize: '9px',
-                              color: 'white',
-                              fontWeight: 500,
-                              lineHeight: 1.2,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
+                              fontSize: '9px', color: 'white', fontWeight: 500,
+                              lineHeight: 1.2, overflow: 'hidden',
+                              textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                               paddingTop: blockH > 20 ? '2px' : '0px',
                             }}>
                               {pe.event.title}
@@ -658,7 +669,6 @@ export function TimelineView({ onBack }: TimelineViewProps) {
                           </foreignObject>
                         )}
 
-                        {/* Tooltip on hover (title if block is too small) */}
                         {blockW <= 40 && (
                           <title>{pe.event.title} ({formatEventTime(pe.event)})</title>
                         )}
@@ -669,33 +679,6 @@ export function TimelineView({ onBack }: TimelineViewProps) {
               </g>
             )
           })}
-
-          {/* ─── Collapsed track indicators ─── */}
-          {collapsedCount > 0 && (
-            <g>
-              {activeTracks
-                .filter(t => collapsedTracks.has(t.id))
-                .map((track, i) => (
-                  <g
-                    key={`collapsed-${track.id}`}
-                    className="cursor-pointer"
-                    onClick={() => toggleTrack(track.id)}
-                  >
-                    <rect
-                      x={4} y={svgHeight - 4 + i * 16}
-                      width={LABEL_WIDTH - 8} height={14}
-                      rx={3} fill={track.fill} opacity={0.15}
-                    />
-                    <text
-                      x={12} y={svgHeight + 7 + i * 16}
-                      fontSize={9} fill={track.fill} fontWeight={500}
-                    >
-                      ▸ {track.label} (rejtett)
-                    </text>
-                  </g>
-                ))}
-            </g>
-          )}
 
           {/* ─── Undated events section ─── */}
           {undatedEvents.length > 0 && (
