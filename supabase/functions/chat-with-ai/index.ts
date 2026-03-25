@@ -96,7 +96,7 @@ function buildRecorderPrompt(
 SZABÁLYOK:
 - Csak a felhasználó által MONDOTT tényeket rögzítsd, NE az AI kérdéseit
 - Ha meglévő event-et pontosít, PONTOSAN ugyanazt a title-t használd
-- narrative_text: 1-3 mondat, harmadik személyű, életrajzi stílus, múlt idő. Példa: "Szabolcs 1985-ben született Budapesten. A család egy panellakásban élt a XIII. kerületben."
+- narrative_text: 1-3 mondat, EGYES SZÁM ELSŐ SZEMÉLYBEN, életrajzi stílus, múlt idő. Példa: "1970. április 11-én születtem Budapesten. Általános iskolába a Fáy András iskolába jártam." Másik példa: "2016-ban született Márton fiam."
 - NE generálj beszélgetős választ, CSAK adatot rögzíts
 - Egy helyszín CSAK EGYSZER szerepelhet. Ha a helyszín már létezik a "Létező helyszín nevek" listában, PONTOSAN ugyanazt a nevet használd (betűről betűre egyezzen!). NE hozz létre új variánst (pl. ha "Fáy András iskola" létezik, NE írd "Fáy András Általános Iskola"-nak)
 - Egy személy CSAK EGYSZER szerepelhet. Ha a személy már létezik a "Létező személy nevek" listában, PONTOSAN ugyanazt a nevet használd
