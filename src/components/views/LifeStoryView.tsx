@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ArrowLeft, Users, MapPin, Calendar, Heart, Download, FileText, FileJson } from 'lucide-react'
@@ -116,8 +115,8 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
           </div>
         </div>
       </div>
-      <Tabs defaultValue="story" className="flex-1 flex flex-col">
-        <div className="border-b px-4">
+      <Tabs defaultValue="story" className="flex-1 min-h-0 flex flex-col">
+        <div className="border-b px-4 flex-shrink-0">
           <TabsList className="h-10">
             <TabsTrigger value="story">Életút</TabsTrigger>
             <TabsTrigger value="persons">
@@ -134,7 +133,7 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
             </TabsTrigger>
           </TabsList>
         </div>
-        <ScrollArea className="flex-1 p-4">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4">
           <div className="max-w-3xl mx-auto">
             <TabsContent value="story" className="mt-0">
               {narrativeText ? (
@@ -244,7 +243,7 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
               })}
             </TabsContent>
           </div>
-        </ScrollArea>
+        </div>
       </Tabs>
     </div>
   )
