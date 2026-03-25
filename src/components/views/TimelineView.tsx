@@ -112,8 +112,35 @@ const OTHER_TRACK: TrackDef = {
 }
 
 function findTrack(category: string): TrackDef {
-  const cat = (category || '').toLowerCase()
-  return TRACKS.find(t => t.categories.includes(cat)) || OTHER_TRACK
+  const cat = (category || '').toLowerCase().trim()
+  // Exact match first
+  const exact = TRACKS.find(t => t.categories.includes(cat))
+  if (exact) return exact
+  // Partial / fuzzy match — if category contains or is contained by a track category
+  const partial = TRACKS.find(t =>
+    t.categories.some(tc => cat.includes(tc) || tc.includes(cat))
+  )
+  if (partial) return partial
+  // Keyword-based fallback
+  const keywordMap: Record<string, string> = {
+    job: 'career', employment: 'career', profession: 'career', company: 'career',
+    cég: 'career', állás: 'career', foglalkozás: 'career', bank: 'career', hivatal: 'career',
+    school: 'education', study: 'education', degree: 'education', diploma: 'education',
+    tanulás: 'education', képzés: 'education',
+    love: 'relationship', partner: 'relationship', divorce: 'relationship', válás: 'relationship',
+    child: 'family', parent: 'family', death: 'family', halál: 'family', gyerek: 'family',
+    house: 'residence', apartment: 'residence', lakás: 'residence', ház: 'residence', otthon: 'residence',
+    trip: 'travel', vacation: 'travel', nyaralás: 'travel', kirándulás: 'travel',
+    illness: 'health', disease: 'health', betegség: 'health', kórház: 'health', hospital: 'health',
+    exercise: 'sport', fitness: 'sport', edzés: 'sport',
+  }
+  for (const [keyword, trackCat] of Object.entries(keywordMap)) {
+    if (cat.includes(keyword)) {
+      const t = TRACKS.find(tr => tr.categories.includes(trackCat))
+      if (t) return t
+    }
+  }
+  return OTHER_TRACK
 }
 
 // ── Time utilities ────────────────────────────────────────────────────────────
@@ -184,6 +211,7 @@ export function TimelineView({ onBack }: TimelineViewProps) {
   const { events, timePeriods, lifeStory } = useLifeStoryStore()
   const [zoom, setZoom] = useState(1)
   const [selectedEvent, setSelectedEvent] = useState<LifeEvent | null>(null)
+  const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null)
   const [collapsedTracks, setCollapsedTracks] = useState<Set<string>>(new Set())
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -363,6 +391,7 @@ export function TimelineView({ onBack }: TimelineViewProps) {
           width={Math.max(svgWidth, 400)}
           height={Math.max(svgHeight + (undatedEvents.length > 0 ? 60 : 0), 200)}
           className="select-none"
+          onClick={() => { setSelectedEvent(null); setPopupPos(null) }}
         >
           {/* ─── Ruler (year markers) ─── */}
           <g>
@@ -512,7 +541,21 @@ export function TimelineView({ onBack }: TimelineViewProps) {
                         className="cursor-pointer"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setSelectedEvent(isSelected ? null : pe.event)
+                          if (isSelected) {
+                            setSelectedEvent(null)
+                            setPopupPos(null)
+                          } else {
+                            setSelectedEvent(pe.event)
+                            // Position popup relative to scroll container
+                            const container = scrollRef.current
+                            if (container) {
+                              const rect = container.getBoundingClientRect()
+                              setPopupPos({
+                                x: e.clientX - rect.left + container.scrollLeft,
+                                y: e.clientY - rect.top + container.scrollTop,
+                              })
+                            }
+                          }
                         }}
                       >
                         {/* Block rectangle */}
@@ -612,7 +655,23 @@ export function TimelineView({ onBack }: TimelineViewProps) {
                   <g
                     key={ev.id}
                     className="cursor-pointer"
-                    onClick={() => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation()
+                      if (selectedEvent?.id === ev.id) {
+                        setSelectedEvent(null)
+                        setPopupPos(null)
+                      } else {
+                        setSelectedEvent(ev)
+                        const container = scrollRef.current
+                        if (container) {
+                          const rect = container.getBoundingClientRect()
+                          setPopupPos({
+                            x: e.clientX - rect.left + container.scrollLeft,
+                            y: e.clientY - rect.top + container.scrollTop,
+                          })
+                        }
+                      }
+                    }}
                   >
                     <rect
                       x={LABEL_WIDTH + i * 90} y={svgHeight + 10}
@@ -635,46 +694,55 @@ export function TimelineView({ onBack }: TimelineViewProps) {
         </svg>
       </div>
 
-      {/* ─── Selected event detail panel ─── */}
-      {selectedEvent && (
-        <div className="border-t bg-background px-4 py-3 flex gap-3 items-start animate-in slide-in-from-bottom-2 duration-200">
-          <div
-            className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
-            style={{ backgroundColor: findTrack(selectedEvent.category).fill }}
-          />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-sm">{selectedEvent.title}</span>
-              {selectedEvent.is_turning_point && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-400 text-amber-600">
-                  ★ Fordulópont
-                </Badge>
-              )}
+      {/* ─── Floating popup for selected event ─── */}
+      {selectedEvent && popupPos && (
+        <div
+          className="absolute z-50 pointer-events-auto"
+          style={{
+            left: Math.min(popupPos.x, (scrollRef.current?.scrollWidth ?? 400) - 280),
+            top: Math.max(8, popupPos.y - 140),
+          }}
+        >
+          <div className="bg-background border rounded-lg shadow-xl p-3 w-[260px] animate-in fade-in zoom-in-95 duration-150">
+            {/* Arrow/caret pointing down */}
+            <div className="flex items-start gap-2">
+              <div
+                className="w-3 h-3 rounded-full mt-0.5 flex-shrink-0"
+                style={{ backgroundColor: findTrack(selectedEvent.category).fill }}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-semibold text-sm leading-tight">{selectedEvent.title}</span>
+                  {selectedEvent.is_turning_point && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 border-amber-400 text-amber-600">
+                      ★
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {formatEventTime(selectedEvent)}
+                  {' · '}
+                  {findTrack(selectedEvent.category).label}
+                </p>
+                {selectedEvent.description && (
+                  <p className="text-xs text-foreground/80 mt-1.5 line-clamp-3">
+                    {selectedEvent.description}
+                  </p>
+                )}
+                {selectedEvent.narrative_text && (
+                  <p className="text-xs text-foreground/60 mt-1 italic line-clamp-3">
+                    {selectedEvent.narrative_text}
+                  </p>
+                )}
+              </div>
+              <button
+                className="text-muted-foreground hover:text-foreground text-xs flex-shrink-0 -mt-0.5 -mr-1"
+                onClick={() => { setSelectedEvent(null); setPopupPos(null) }}
+              >
+                ✕
+              </button>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {formatEventTime(selectedEvent)}
-              {' · '}
-              {findTrack(selectedEvent.category).label}
-            </p>
-            {selectedEvent.description && (
-              <p className="text-xs text-foreground/80 mt-1 line-clamp-2">
-                {selectedEvent.description}
-              </p>
-            )}
-            {selectedEvent.narrative_text && (
-              <p className="text-xs text-foreground/60 mt-1 italic line-clamp-3">
-                {selectedEvent.narrative_text}
-              </p>
-            )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 flex-shrink-0"
-            onClick={() => setSelectedEvent(null)}
-          >
-            ✕
-          </Button>
         </div>
       )}
     </div>

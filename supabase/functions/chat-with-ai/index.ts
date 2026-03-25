@@ -102,6 +102,7 @@ SZABÁLYOK:
 - Egy személy CSAK EGYSZER szerepelhet. Ha a személy már létezik a "Létező személy nevek" listában, PONTOSAN ugyanazt a nevet használd
 - ESEMÉNYEK FRISSÍTÉSE: Ha a felhasználó pontosít egy korábbi eseményt (pl. megadja a dátumot), NE hozz létre új eseményt — használd PONTOSAN UGYANAZT a title-t
 - Ha nincs új tény az üzenetben (pl. csak üdvözlés, kérdés, köszönés), adj vissza üres listákat
+- KATEGÓRIA: Az event "category" mező értéke CSAK az alábbiak egyike lehet: career, education, relationship, family, residence, travel, health, sport, childhood. Ha nem illik egyik sem, használd a legközelebbit.
 - DÁTUM FORMÁTUM: exact_date CSAK egyetlen nap lehet YYYY-MM-DD formátumban (pl. "1985-03-15"). Ha időszakról van szó (pl. "1977-1984"), NE használd az exact_date mezőt! Helyette: time_type="estimated_year", estimated_year=1977 (a kezdő év), és a teljes időszakot a life_phase mezőbe írd (pl. "1977-1984").
 
 ${titlesStr}
