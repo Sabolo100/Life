@@ -164,17 +164,58 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
     if (entities.events?.length) {
       const toInsert = entities.events.map(e => {
         const event = { ...e, user_id: user.id }
+
         // Sanitize exact_date: must be YYYY-MM-DD format, otherwise move to estimated_year
         if (event.exact_date && !/^\d{4}-\d{2}-\d{2}$/.test(event.exact_date as string)) {
           const yearMatch = (event.exact_date as string).match(/(\d{4})/)
           if (yearMatch) {
             event.estimated_year = parseInt(yearMatch[1])
-            event.life_phase = event.exact_date as string
+            event.life_phase = event.life_phase || (event.exact_date as string)
             event.time_type = 'estimated_year'
           }
           event.exact_date = null
           console.log('[upsertEntities] Sanitized invalid exact_date to estimated_year:', event.estimated_year)
         }
+
+        // Ensure estimated_year is filled if we have a year anywhere
+        if (!event.estimated_year || (event.estimated_year as number) < 1800) {
+          // Try to extract from life_phase (e.g. "2000-2010", "2000")
+          if (event.life_phase) {
+            const m = (event.life_phase as string).match(/(\d{4})/)
+            if (m) {
+              event.estimated_year = parseInt(m[1])
+              if (event.time_type === 'life_phase' || event.time_type === 'uncertain') {
+                event.time_type = 'estimated_year'
+              }
+              console.log('[upsertEntities] Extracted year from life_phase:', event.estimated_year)
+            }
+          }
+          // Try from description
+          if ((!event.estimated_year || (event.estimated_year as number) < 1800) && event.description) {
+            const m = (event.description as string).match(/(\d{4})/)
+            if (m) {
+              const y = parseInt(m[1])
+              if (y > 1800 && y < 2100) {
+                event.estimated_year = y
+                event.time_type = 'estimated_year'
+                console.log('[upsertEntities] Extracted year from description:', y)
+              }
+            }
+          }
+          // Try from uncertain_time
+          if ((!event.estimated_year || (event.estimated_year as number) < 1800) && event.uncertain_time) {
+            const m = (event.uncertain_time as string).match(/(\d{4})/)
+            if (m) {
+              const y = parseInt(m[1])
+              if (y > 1800 && y < 2100) {
+                event.estimated_year = y
+                event.time_type = 'estimated_year'
+                console.log('[upsertEntities] Extracted year from uncertain_time:', y)
+              }
+            }
+          }
+        }
+
         return event
       })
       const { error } = await supabase.from('events').upsert(toInsert as LifeEvent[], { onConflict: 'user_id,title' })

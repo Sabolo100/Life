@@ -161,24 +161,69 @@ const LIFE_PHASE_YEAR: Record<string, number> = {
   elderly: 75, időskor: 75,
 }
 
+/** Extract the START year from an event — tries ALL fields regardless of time_type */
 function getEventYear(event: LifeEvent, birthYear: number | null): number | null {
-  if (event.time_type === 'exact_date' && event.exact_date) {
-    return new Date(event.exact_date).getFullYear()
+  // 1. exact_date → year
+  if (event.exact_date) {
+    const d = new Date(event.exact_date)
+    if (!isNaN(d.getTime())) return d.getFullYear()
   }
-  if (event.time_type === 'estimated_year' && event.estimated_year) {
+
+  // 2. estimated_year
+  if (event.estimated_year && event.estimated_year > 1800) {
     return event.estimated_year
   }
-  if (event.time_type === 'life_phase' && event.life_phase && birthYear) {
-    const offset = LIFE_PHASE_YEAR[event.life_phase.toLowerCase()]
-    if (offset !== undefined) return birthYear + offset
+
+  // 3. life_phase — try to extract a 4-digit year from it (e.g. "2000-2010", "2000")
+  if (event.life_phase) {
+    const yearMatch = event.life_phase.match(/(\d{4})/)
+    if (yearMatch) {
+      const y = parseInt(yearMatch[1])
+      if (y > 1800 && y < 2100) return y
+    }
+    // Named life phase (e.g. "childhood") → offset from birth year
+    if (birthYear) {
+      const offset = LIFE_PHASE_YEAR[event.life_phase.toLowerCase()]
+      if (offset !== undefined) return birthYear + offset
+    }
   }
+
+  // 4. uncertain_time — last resort, try to find a year in free text
+  if (event.uncertain_time) {
+    const yearMatch = event.uncertain_time.match(/(\d{4})/)
+    if (yearMatch) {
+      const y = parseInt(yearMatch[1])
+      if (y > 1800 && y < 2100) return y
+    }
+  }
+
+  // 5. description — sometimes the year is only mentioned here
+  if (event.description) {
+    const yearMatch = event.description.match(/(\d{4})/)
+    if (yearMatch) {
+      const y = parseInt(yearMatch[1])
+      if (y > 1800 && y < 2100) return y
+    }
+  }
+
   return null
 }
 
-/** Try to parse an end year from life_phase text like "1977-1984" */
+/** Extract the END year from an event — tries life_phase, description, etc. */
 function getEventEndYear(event: LifeEvent): number | null {
+  // Check life_phase for range patterns: "2000-2010", "2000–2010"
   if (event.life_phase) {
     const m = event.life_phase.match(/(\d{4})\s*[-–]\s*(\d{4})/)
+    if (m) return parseInt(m[2])
+  }
+  // Check description for range patterns
+  if (event.description) {
+    const m = event.description.match(/(\d{4})\s*[-–]\s*(\d{4})/)
+    if (m) return parseInt(m[2])
+  }
+  // Check uncertain_time
+  if (event.uncertain_time) {
+    const m = event.uncertain_time.match(/(\d{4})\s*[-–]\s*(\d{4})/)
     if (m) return parseInt(m[2])
   }
   return null

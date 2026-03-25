@@ -103,7 +103,14 @@ SZABÁLYOK:
 - ESEMÉNYEK FRISSÍTÉSE: Ha a felhasználó pontosít egy korábbi eseményt (pl. megadja a dátumot), NE hozz létre új eseményt — használd PONTOSAN UGYANAZT a title-t
 - Ha nincs új tény az üzenetben (pl. csak üdvözlés, kérdés, köszönés), adj vissza üres listákat
 - KATEGÓRIA: Az event "category" mező értéke CSAK az alábbiak egyike lehet: career, education, relationship, family, residence, travel, health, sport, childhood. Ha nem illik egyik sem, használd a legközelebbit.
-- DÁTUM FORMÁTUM: exact_date CSAK egyetlen nap lehet YYYY-MM-DD formátumban (pl. "1985-03-15"). Ha időszakról van szó (pl. "1977-1984"), NE használd az exact_date mezőt! Helyette: time_type="estimated_year", estimated_year=1977 (a kezdő év), és a teljes időszakot a life_phase mezőbe írd (pl. "1977-1984").
+- DÁTUM — NAGYON FONTOS:
+  • Ha a felhasználó pontos dátumot ad (pl. "1985. március 15."): time_type="exact_date", exact_date="1985-03-15"
+  • Ha CSAK évszámot ad (pl. "2000"): time_type="estimated_year", estimated_year=2000, life_phase=null
+  • Ha IDŐSZAKOT ad (pl. "2000-2010" vagy "2000–2010"): time_type="estimated_year", estimated_year=2000, life_phase="2000-2010"
+  • Ha életszakaszt említ dátum nélkül (pl. "gyerekkoromban"): time_type="life_phase", life_phase="childhood"
+  • Ha teljesen bizonytalan: time_type="uncertain", uncertain_time="az eredeti szöveg"
+  • SOHA ne hagyd üresen az estimated_year-t ha van bármilyen évszám! Az estimated_year MINDIG legyen kitöltve ha van évszám.
+  • exact_date CSAK egyetlen nap lehet YYYY-MM-DD formátumban. SOHA ne írj ide időszakot (pl. "2000-2010")!
 
 ${titlesStr}
 ${locationsStr}
