@@ -75,12 +75,12 @@ export function MainPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
         <div className="hidden md:block w-64 border-r bg-muted/30">
-          <SessionSidebar />
+          <SessionSidebar onSessionSelect={() => setCurrentView('chat')} />
         </div>
         {/* Mobile sidebar */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <SheetContent side="left" className="p-0 w-72">
-            <SessionSidebar onClose={() => setSidebarOpen(false)} />
+            <SessionSidebar onClose={() => setSidebarOpen(false)} onSessionSelect={() => setCurrentView('chat')} />
           </SheetContent>
         </Sheet>
         {/* Main content */}

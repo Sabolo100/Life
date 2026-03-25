@@ -8,6 +8,7 @@ import type { SessionMode } from '@/types'
 
 interface SessionSidebarProps {
   onClose?: () => void
+  onSessionSelect?: () => void
 }
 
 function formatDate(iso: string): string {
@@ -30,7 +31,7 @@ function formatDate(iso: string): string {
     : `${year}.${month}.${day}.`
 }
 
-export function SessionSidebar({ onClose }: SessionSidebarProps) {
+export function SessionSidebar({ onClose, onSessionSelect }: SessionSidebarProps) {
   const { sessions, currentSession, createSession, selectSession, deleteSession, updateSessionTitle } = useChatStore()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -44,6 +45,7 @@ export function SessionSidebar({ onClose }: SessionSidebarProps) {
   const handleSelect = async (id: string) => {
     if (editingId) return
     await selectSession(id)
+    onSessionSelect?.()
     onClose?.()
   }
 
