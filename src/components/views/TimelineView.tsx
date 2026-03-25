@@ -306,17 +306,13 @@ export function TimelineView({ onBack }: TimelineViewProps) {
     isRange: boolean
   }
 
-  const { placedEvents, activeTracks, undatedEvents } = useMemo(() => {
+  const { placedEvents, activeTracks } = useMemo(() => {
     const placed: PlacedEvent[] = []
-    const undated: LifeEvent[] = []
     const trackIds = new Set<string>()
 
     for (const event of events) {
       const year = getEventYear(event, birthYear)
-      if (year === null) {
-        undated.push(event)
-        continue
-      }
+      if (year === null) continue
 
       const track = findTrack(event.category)
       trackIds.add(track.id)
@@ -337,7 +333,7 @@ export function TimelineView({ onBack }: TimelineViewProps) {
     // Only add "Egyéb" if there are events that didn't match any track
     if (trackIds.has('other')) active.push(OTHER_TRACK)
 
-    return { placedEvents: placed, activeTracks: active, undatedEvents: undated }
+    return { placedEvents: placed, activeTracks: active }
   }, [events, birthYear])
 
   // ── Zoom handlers ─────────────────────────────────────────────────────────
@@ -450,9 +446,8 @@ export function TimelineView({ onBack }: TimelineViewProps) {
       <div className="flex-1 overflow-auto relative" ref={scrollRef}>
         <svg
           width={Math.max(svgWidth, 400)}
-          height={Math.max(svgHeight + (undatedEvents.length > 0 ? 60 : 0), 200)}
+          height={Math.max(svgHeight, 200)}
           className="select-none"
-          onClick={() => { setSelectedEvent(null); setPopupPos(null) }}
         >
           {/* ─── Ruler (year markers) ─── */}
           <g>
@@ -600,14 +595,6 @@ export function TimelineView({ onBack }: TimelineViewProps) {
                 <line x1={0} y1={trackY + trackH} x2={svgWidth} y2={trackY + trackH}
                   stroke="#e2e8f0" strokeWidth={0.5} />
 
-                {/* Empty track hint */}
-                {trackEvents.length === 0 && (
-                  <text x={LABEL_WIDTH + 16} y={trackY + trackH / 2 + 4}
-                    fontSize={11} fill="#cbd5e1" fontStyle="italic">
-                    Mesélj az AI-nak erről a témáról...
-                  </text>
-                )}
-
                 {/* Event blocks/dots */}
                 {lanes.map((lane, laneIdx) =>
                   lane.map(pe => {
@@ -625,22 +612,20 @@ export function TimelineView({ onBack }: TimelineViewProps) {
                       <g
                         key={pe.event.id}
                         className="cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (isSelected) {
-                            setSelectedEvent(null)
-                            setPopupPos(null)
-                          } else {
-                            setSelectedEvent(pe.event)
-                            const container = scrollRef.current
-                            if (container) {
-                              const rect = container.getBoundingClientRect()
-                              setPopupPos({
-                                x: e.clientX - rect.left + container.scrollLeft,
-                                y: e.clientY - rect.top + container.scrollTop,
-                              })
-                            }
+                        onMouseEnter={(e) => {
+                          setSelectedEvent(pe.event)
+                          const container = scrollRef.current
+                          if (container) {
+                            const rect = container.getBoundingClientRect()
+                            setPopupPos({
+                              x: e.clientX - rect.left + container.scrollLeft,
+                              y: e.clientY - rect.top + container.scrollTop,
+                            })
                           }
+                        }}
+                        onMouseLeave={() => {
+                          setSelectedEvent(null)
+                          setPopupPos(null)
                         }}
                       >
                         <rect x={x1} y={blockY} width={blockW} height={blockH}
@@ -680,108 +665,47 @@ export function TimelineView({ onBack }: TimelineViewProps) {
             )
           })}
 
-          {/* ─── Undated events section ─── */}
-          {undatedEvents.length > 0 && (
-            <g>
-              <line
-                x1={0} y1={svgHeight + 2} x2={svgWidth} y2={svgHeight + 2}
-                stroke="#e2e8f0" strokeWidth={1}
-              />
-              <text x={8} y={svgHeight + 20} fontSize={10} fill="#94a3b8" fontWeight={500}>
-                Dátum nélküli ({undatedEvents.length})
-              </text>
-              {undatedEvents.slice(0, 10).map((ev, i) => {
-                const track = findTrack(ev.category)
-                return (
-                  <g
-                    key={ev.id}
-                    className="cursor-pointer"
-                    onClick={(e: React.MouseEvent) => {
-                      e.stopPropagation()
-                      if (selectedEvent?.id === ev.id) {
-                        setSelectedEvent(null)
-                        setPopupPos(null)
-                      } else {
-                        setSelectedEvent(ev)
-                        const container = scrollRef.current
-                        if (container) {
-                          const rect = container.getBoundingClientRect()
-                          setPopupPos({
-                            x: e.clientX - rect.left + container.scrollLeft,
-                            y: e.clientY - rect.top + container.scrollTop,
-                          })
-                        }
-                      }
-                    }}
-                  >
-                    <rect
-                      x={LABEL_WIDTH + i * 90} y={svgHeight + 10}
-                      width={82} height={28} rx={4}
-                      fill={track.fill} opacity={0.6}
-                    />
-                    <foreignObject
-                      x={LABEL_WIDTH + i * 90 + 4} y={svgHeight + 12}
-                      width={74} height={24}
-                    >
-                      <div style={{ fontSize: '8px', color: 'white', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {ev.title}
-                      </div>
-                    </foreignObject>
-                  </g>
-                )
-              })}
-            </g>
-          )}
         </svg>
       </div>
 
-      {/* ─── Floating popup for selected event ─── */}
+      {/* ─── Floating tooltip on hover ─── */}
       {selectedEvent && popupPos && (
         <div
-          className="absolute z-50 pointer-events-auto"
+          className="absolute z-50 pointer-events-none"
           style={{
-            left: Math.min(popupPos.x, (scrollRef.current?.scrollWidth ?? 400) - 280),
-            top: Math.max(8, popupPos.y - 140),
+            left: Math.min(popupPos.x, (scrollRef.current?.scrollWidth ?? 400) - 270),
+            top: Math.max(8, popupPos.y - 130),
           }}
         >
-          <div className="bg-background border rounded-lg shadow-xl p-3 w-[260px] animate-in fade-in zoom-in-95 duration-150">
-            {/* Arrow/caret pointing down */}
+          <div className="bg-background border rounded-lg shadow-xl p-2.5 w-[250px]">
             <div className="flex items-start gap-2">
               <div
-                className="w-3 h-3 rounded-full mt-0.5 flex-shrink-0"
+                className="w-2.5 h-2.5 rounded-full mt-0.5 flex-shrink-0"
                 style={{ backgroundColor: findTrack(selectedEvent.category).fill }}
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-semibold text-sm leading-tight">{selectedEvent.title}</span>
+                  <span className="font-semibold text-xs leading-tight">{selectedEvent.title}</span>
                   {selectedEvent.is_turning_point && (
-                    <Badge variant="outline" className="text-[10px] px-1 py-0 border-amber-400 text-amber-600">
-                      ★
-                    </Badge>
+                    <span className="text-[10px] text-amber-600">★</span>
                   )}
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
+                <p className="text-[10px] text-muted-foreground mt-0.5">
                   {formatEventTime(selectedEvent)}
                   {' · '}
                   {findTrack(selectedEvent.category).label}
                 </p>
                 {selectedEvent.description && (
-                  <p className="text-xs text-foreground/80 mt-1.5 line-clamp-3">
+                  <p className="text-[11px] text-foreground/80 mt-1 line-clamp-2">
                     {selectedEvent.description}
                   </p>
                 )}
                 {selectedEvent.narrative_text && (
-                  <p className="text-xs text-foreground/60 mt-1 italic line-clamp-3">
+                  <p className="text-[11px] text-foreground/60 mt-0.5 italic line-clamp-2">
                     {selectedEvent.narrative_text}
                   </p>
                 )}
               </div>
-              <button
-                className="text-muted-foreground hover:text-foreground text-xs flex-shrink-0 -mt-0.5 -mr-1"
-                onClick={() => { setSelectedEvent(null); setPopupPos(null) }}
-              >
-                ✕
-              </button>
             </div>
           </div>
         </div>
