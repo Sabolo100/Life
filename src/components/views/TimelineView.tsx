@@ -287,8 +287,9 @@ export function TimelineView({ onBack }: TimelineViewProps) {
       })
     }
 
-    // Determine which tracks to show: those with events + always show base tracks
-    const active = TRACKS.filter(t => trackIds.has(t.id))
+    // ALWAYS show ALL base tracks (even empty ones — visual cue that info is needed)
+    const active = [...TRACKS]
+    // Only add "Egyéb" if there are events that didn't match any track
     if (trackIds.has('other')) active.push(OTHER_TRACK)
 
     return { placedEvents: placed, activeTracks: active, undatedEvents: undated }
@@ -498,12 +499,14 @@ export function TimelineView({ onBack }: TimelineViewProps) {
                 >
                   {track.label}
                 </text>
-                <text
-                  x={LABEL_WIDTH - 8} y={trackY + TRACK_HEIGHT / 2 + 3}
-                  textAnchor="end" fontSize={9} fill="#94a3b8"
-                >
-                  {trackEvents.length}
-                </text>
+                {trackEvents.length > 0 && (
+                  <text
+                    x={LABEL_WIDTH - 8} y={trackY + TRACK_HEIGHT / 2 + 3}
+                    textAnchor="end" fontSize={9} fill="#94a3b8"
+                  >
+                    {trackEvents.length}
+                  </text>
+                )}
 
                 {/* Collapse/expand toggle */}
                 <g
@@ -521,6 +524,16 @@ export function TimelineView({ onBack }: TimelineViewProps) {
                 {/* Track bottom border */}
                 <line x1={0} y1={trackY + TRACK_HEIGHT} x2={svgWidth} y2={trackY + TRACK_HEIGHT}
                   stroke="#e2e8f0" strokeWidth={0.5} />
+
+                {/* Empty track hint */}
+                {trackEvents.length === 0 && (
+                  <text
+                    x={LABEL_WIDTH + 16} y={trackY + TRACK_HEIGHT / 2 + 4}
+                    fontSize={11} fill="#cbd5e1" fontStyle="italic"
+                  >
+                    Mesélj az AI-nak erről a témáról...
+                  </text>
+                )}
 
                 {/* Event blocks/dots */}
                 {lanes.map((lane, laneIdx) =>

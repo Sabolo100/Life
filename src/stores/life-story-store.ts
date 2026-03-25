@@ -57,10 +57,58 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
       supabase.from('family_relationships').select('*').eq('user_id', user.id),
     ])
 
+    // Normalize event categories to canonical values
+    const rawEvents = (eventsRes.data as LifeEvent[]) || []
+    const VALID_CATEGORIES = ['career', 'education', 'relationship', 'family', 'residence', 'travel', 'health', 'sport', 'childhood']
+    const CATEGORY_ALIASES: Record<string, string> = {
+      work: 'career', munka: 'career', munkahely: 'career', karrier: 'career', job: 'career',
+      állás: 'career', cég: 'career', foglalkozás: 'career', bank: 'career', hivatal: 'career',
+      iskola: 'education', egyetem: 'education', tanulmányok: 'education', school: 'education',
+      tanulás: 'education', képzés: 'education', study: 'education',
+      kapcsolat: 'relationship', házasság: 'relationship', marriage: 'relationship',
+      partner: 'relationship', love: 'relationship', válás: 'relationship',
+      család: 'family', születés: 'family', birth: 'family', loss: 'family',
+      halál: 'family', gyerek: 'family', child: 'family',
+      gyermekkor: 'childhood', gyerekkor: 'childhood',
+      lakóhely: 'residence', költözés: 'residence', lakás: 'residence', ház: 'residence',
+      otthon: 'residence', home: 'residence', moving: 'residence',
+      utazás: 'travel', trip: 'travel', nyaralás: 'travel', kirándulás: 'travel', vacation: 'travel',
+      egészség: 'health', betegség: 'health', kórház: 'health', hospital: 'health',
+      illness: 'health', hardship: 'health',
+      edzés: 'sport', fitness: 'sport', exercise: 'sport',
+    }
+
+    const eventsToUpdate: { id: string; category: string }[] = []
+    const normalizedEvents = rawEvents.map(ev => {
+      const cat = (ev.category || '').toLowerCase().trim()
+      if (VALID_CATEGORIES.includes(cat)) return ev // already valid
+
+      // Try alias map
+      let newCat = CATEGORY_ALIASES[cat]
+      // Try partial match
+      if (!newCat) {
+        for (const [alias, target] of Object.entries(CATEGORY_ALIASES)) {
+          if (cat.includes(alias) || alias.includes(cat)) { newCat = target; break }
+        }
+      }
+      if (newCat && newCat !== ev.category) {
+        eventsToUpdate.push({ id: ev.id, category: newCat })
+        return { ...ev, category: newCat }
+      }
+      return ev
+    })
+
+    // Batch update mis-categorized events in DB (fire-and-forget)
+    if (eventsToUpdate.length > 0) {
+      for (const { id, category } of eventsToUpdate) {
+        supabase.from('events').update({ category }).eq('id', id).then(() => {})
+      }
+    }
+
     set({
       lifeStory: storyRes.data as LifeStory | null,
       persons: (personsRes.data as Person[]) || [],
-      events: (eventsRes.data as LifeEvent[]) || [],
+      events: normalizedEvents,
       locations: (locationsRes.data as Location[]) || [],
       timePeriods: (periodsRes.data as TimePeriod[]) || [],
       emotions: (emotionsRes.data as Emotion[]) || [],
