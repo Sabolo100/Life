@@ -25,6 +25,9 @@ interface LifeStoryState {
   geocodeLocation: (locationId: string) => Promise<void>
   confirmLocation: (locationId: string) => Promise<void>
   updateLocationCoordinates: (locationId: string, coordinates: { lat: number; lng: number }) => Promise<void>
+  addPerson: (person: Partial<Person>) => Promise<void>
+  updatePerson: (id: string, updates: Partial<Person>) => Promise<void>
+  deletePerson: (id: string) => Promise<void>
   addFamilyRelationship: (fromPersonId: string | null, toPersonId: string | null, type: FamilyRelType) => Promise<void>
   batchAddFamilyRelationships: (entries: { fromPersonId: string | null; toPersonId: string | null; type: FamilyRelType }[]) => Promise<void>
   removeFamilyRelationship: (id: string) => Promise<void>
@@ -346,6 +349,57 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
     if (data) {
       set(state => ({ familyRelationships: [...state.familyRelationships, data as FamilyRelationship] }))
     }
+  },
+
+  addPerson: async (person) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data, error } = await supabase
+      .from('persons')
+      .insert({ ...person, user_id: user.id })
+      .select()
+      .single()
+    if (error) { console.error('[addPerson] error:', error); throw error }
+    if (data) {
+      set(state => ({ persons: [...state.persons, data as Person] }))
+    }
+  },
+
+  updatePerson: async (id, updates) => {
+    const { error } = await supabase
+      .from('persons')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) { console.error('[updatePerson] error:', error); throw error }
+    set(state => ({
+      persons: state.persons.map(p => p.id === id ? { ...p, ...updates } : p),
+    }))
+  },
+
+  deletePerson: async (id) => {
+    // 1. Delete the person (family_relationships cascade automatically via FK)
+    const { error } = await supabase.from('persons').delete().eq('id', id)
+    if (error) { console.error('[deletePerson] error:', error); throw error }
+
+    // 2. Clean up person_ids arrays in events (not FK-constrained)
+    const eventsToFix = get().events.filter(e => e.person_ids?.includes(id))
+    for (const ev of eventsToFix) {
+      const newIds = ev.person_ids.filter(pid => pid !== id)
+      await supabase.from('events').update({ person_ids: newIds }).eq('id', ev.id)
+    }
+
+    // 3. Update local state
+    set(state => ({
+      persons: state.persons.filter(p => p.id !== id),
+      familyRelationships: state.familyRelationships.filter(
+        r => r.from_person_id !== id && r.to_person_id !== id
+      ),
+      events: state.events.map(e =>
+        e.person_ids?.includes(id)
+          ? { ...e, person_ids: e.person_ids.filter(pid => pid !== id) }
+          : e
+      ),
+    }))
   },
 
   removeFamilyRelationship: async (id) => {

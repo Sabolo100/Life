@@ -3,10 +3,11 @@ import { useLifeStoryStore } from '@/stores/life-story-store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Users, MapPin, Calendar, Heart, Download, FileText, FileJson } from 'lucide-react'
+import { ArrowLeft, Users, MapPin, Calendar, Heart, Download, FileText, FileJson, Plus, Pencil, Trash2, Check, X } from 'lucide-react'
 import { EmotionBadge } from './EmotionBadge'
 import { useAuthStore } from '@/stores/auth-store'
 import { exportAsJSON, exportAsPDF, exportAsDOCX } from '@/lib/export-service'
+import type { Person } from '@/types'
 
 interface LifeStoryViewProps {
   onBack: () => void
@@ -23,10 +24,21 @@ function sortEventsByTime(events: { exact_date?: string | null; estimated_year?:
   })
 }
 
+const EMPTY_PERSON: Partial<Person> = {
+  name: '',
+  nickname: null,
+  relationship_type: '',
+  related_period: null,
+  notes: null,
+}
+
 export function LifeStoryView({ onBack }: LifeStoryViewProps) {
-  const { lifeStory, persons, events, locations, timePeriods, emotions, openQuestions } = useLifeStoryStore()
+  const { lifeStory, persons, events, locations, timePeriods, emotions, openQuestions, addPerson, updatePerson, deletePerson } = useLifeStoryStore()
   const { profile } = useAuthStore()
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [editingPerson, setEditingPerson] = useState<Partial<Person> | null>(null)
+  const [editingPersonId, setEditingPersonId] = useState<string | null>(null) // null = adding new
+  const [personSaving, setPersonSaving] = useState(false)
 
   const exportData = {
     lifeStory, persons, events, locations, timePeriods, emotions, openQuestions,
@@ -149,17 +161,145 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
               )}
             </TabsContent>
             <TabsContent value="persons" className="mt-0 space-y-3">
-              {persons.length === 0 ? (
-                <p className="text-center py-20 text-muted-foreground">Még nem szerepelnek személyek az életutadban.</p>
-              ) : persons.map(person => (
-                <div key={person.id} className="border rounded-lg p-3">
+              {/* Add new person button */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => { setEditingPerson({ ...EMPTY_PERSON }); setEditingPersonId(null) }}
+              >
+                <Plus className="w-3.5 h-3.5 mr-1.5" /> Új személy hozzáadása
+              </Button>
+
+              {/* Inline editor for add/edit */}
+              {editingPerson && (
+                <div className="border-2 border-primary/30 rounded-lg p-3 space-y-2 bg-muted/20">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm">{person.name}</span>
-                    {person.nickname && <span className="text-xs text-muted-foreground">({person.nickname})</span>}
-                    <Badge variant="secondary" className="text-xs">{person.relationship_type}</Badge>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {editingPersonId ? 'Szerkesztés' : 'Új személy'}
+                    </span>
                   </div>
-                  {person.related_period && <p className="text-xs text-muted-foreground">{person.related_period}</p>}
-                  {person.notes && <p className="text-xs mt-1">{person.notes}</p>}
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      className="col-span-2 text-sm border rounded px-2 py-1.5 bg-background focus:ring-1 focus:ring-primary outline-none"
+                      placeholder="Név *"
+                      value={editingPerson.name || ''}
+                      onChange={e => setEditingPerson({ ...editingPerson, name: e.target.value })}
+                      autoFocus
+                    />
+                    <input
+                      className="text-sm border rounded px-2 py-1.5 bg-background focus:ring-1 focus:ring-primary outline-none"
+                      placeholder="Becenév"
+                      value={editingPerson.nickname || ''}
+                      onChange={e => setEditingPerson({ ...editingPerson, nickname: e.target.value || null })}
+                    />
+                    <input
+                      className="text-sm border rounded px-2 py-1.5 bg-background focus:ring-1 focus:ring-primary outline-none"
+                      placeholder="Kapcsolat (pl. anya, barát)"
+                      value={editingPerson.relationship_type || ''}
+                      onChange={e => setEditingPerson({ ...editingPerson, relationship_type: e.target.value })}
+                    />
+                    <input
+                      className="text-sm border rounded px-2 py-1.5 bg-background focus:ring-1 focus:ring-primary outline-none"
+                      placeholder="Időszak (pl. 2000-2010)"
+                      value={editingPerson.related_period || ''}
+                      onChange={e => setEditingPerson({ ...editingPerson, related_period: e.target.value || null })}
+                    />
+                    <input
+                      className="text-sm border rounded px-2 py-1.5 bg-background focus:ring-1 focus:ring-primary outline-none"
+                      placeholder="Jegyzetek"
+                      value={editingPerson.notes || ''}
+                      onChange={e => setEditingPerson({ ...editingPerson, notes: e.target.value || null })}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setEditingPerson(null); setEditingPersonId(null) }}
+                      disabled={personSaving}
+                    >
+                      <X className="w-3.5 h-3.5 mr-1" /> Mégse
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={!editingPerson.name?.trim() || !editingPerson.relationship_type?.trim() || personSaving}
+                      onClick={async () => {
+                        if (!editingPerson.name?.trim() || !editingPerson.relationship_type?.trim()) return
+                        setPersonSaving(true)
+                        try {
+                          if (editingPersonId) {
+                            await updatePerson(editingPersonId, editingPerson)
+                          } else {
+                            await addPerson(editingPerson)
+                          }
+                          setEditingPerson(null)
+                          setEditingPersonId(null)
+                        } catch (err) {
+                          console.error('Person save error:', err)
+                        } finally {
+                          setPersonSaving(false)
+                        }
+                      }}
+                    >
+                      <Check className="w-3.5 h-3.5 mr-1" /> {personSaving ? 'Mentés...' : 'Mentés'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {persons.length === 0 && !editingPerson ? (
+                <p className="text-center py-12 text-muted-foreground">Még nem szerepelnek személyek az életutadban.</p>
+              ) : persons.map(person => (
+                <div key={person.id} className="border rounded-lg p-3 group">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-sm">{person.name}</span>
+                        {person.nickname && <span className="text-xs text-muted-foreground">({person.nickname})</span>}
+                        <Badge variant="secondary" className="text-xs">{person.relationship_type}</Badge>
+                      </div>
+                      {person.related_period && <p className="text-xs text-muted-foreground">{person.related_period}</p>}
+                      {person.notes && <p className="text-xs mt-1">{person.notes}</p>}
+                    </div>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        title="Szerkesztés"
+                        onClick={() => {
+                          setEditingPerson({
+                            name: person.name,
+                            nickname: person.nickname,
+                            relationship_type: person.relationship_type,
+                            related_period: person.related_period,
+                            notes: person.notes,
+                          })
+                          setEditingPersonId(person.id)
+                        }}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 hover:text-destructive"
+                        title="Törlés"
+                        onClick={async () => {
+                          if (confirm(`Biztosan törölni szeretnéd "${person.name}" személyt? A családfából és minden kapcsolatból is törlődik.`)) {
+                            try {
+                              await deletePerson(person.id)
+                            } catch (err) {
+                              console.error('Delete person error:', err)
+                            }
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               ))}
             </TabsContent>
