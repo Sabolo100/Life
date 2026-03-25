@@ -216,6 +216,8 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('network')
   const [filter, setFilter] = useState<FilterMode>('all')
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
+  const [hoveredPerson, setHoveredPerson] = useState<Person | null>(null)
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [tierOverrides, setTierOverrides] = useState<Record<string, number>>({})
   // Zoom / pan state
@@ -546,8 +548,19 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
           <circle cx="50" cy="50" r="3.5" className="fill-primary" />
           <text x="50" y="50.4" textAnchor="middle" dominantBaseline="middle" className="fill-primary-foreground" fontSize="2" fontWeight="bold">En</text>
 
+          {/* Idle pulse animation */}
+          <defs>
+            <style>{`
+              @keyframes dotPulse {
+                0%, 100% { transform: scale(1); opacity: 0.8; }
+                50% { transform: scale(1.15); opacity: 1; }
+              }
+              .dot-idle { animation: dotPulse 3s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+            `}</style>
+          </defs>
+
           {/* Person nodes */}
-          {positions.map(({ person, x, y, config }) => {
+          {positions.map(({ person, x, y, config }, idx) => {
             const isSelected = selectedPerson?.id === person.id
             const dimmed = selectedPerson && !isSelected
             return (
@@ -555,6 +568,15 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
                 key={person.id}
                 style={{ cursor: 'pointer' }}
                 onClick={(e) => { e.stopPropagation(); setSelectedPerson(isSelected ? null : person) }}
+                onMouseEnter={(e) => {
+                  setHoveredPerson(person)
+                  const svgEl = (e.target as SVGElement).ownerSVGElement
+                  if (svgEl) {
+                    const rect = svgEl.getBoundingClientRect()
+                    setHoverPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+                  }
+                }}
+                onMouseLeave={() => { setHoveredPerson(null); setHoverPos(null) }}
                 onContextMenu={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
@@ -565,21 +587,12 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
               >
                 <circle cx={x} cy={y} r={isSelected ? 3.2 : 2.8} fill={config.stroke} opacity={0.15}
                   stroke={config.stroke} strokeWidth={isSelected ? 0.4 : 0.2} />
-                <circle cx={x} cy={y} r="1.2" fill={config.stroke} opacity={0.8} />
+                <circle cx={x} cy={y} r="1.2" fill={config.stroke} opacity={0.8}
+                  className="dot-idle" style={{ animationDelay: `${idx * 0.4}s` }} />
                 <text x={x} y={y + 3} textAnchor="middle" fontSize="1.5" className="fill-foreground"
                   fontWeight={isSelected ? 'bold' : 'normal'} style={{ pointerEvents: 'none' }}>
                   {person.nickname || person.name}
                 </text>
-                <text x={x} y={y + 4.5} textAnchor="middle" fontSize="1" fill={config.stroke} opacity={0.8}
-                  style={{ pointerEvents: 'none' }}>
-                  {config.label}
-                </text>
-                {person.related_period && (
-                  <text x={x} y={y + 5.8} textAnchor="middle" fontSize="0.9"
-                    className="fill-muted-foreground" opacity={0.7} style={{ pointerEvents: 'none' }}>
-                    {person.related_period}
-                  </text>
-                )}
               </g>
             )
           })}
@@ -613,6 +626,34 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
                 {contextMenu.currentTier === tier && <span className="ml-auto text-xs text-muted-foreground">jelenlegi</span>}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Hover tooltip */}
+        {hoveredPerson && hoverPos && !contextMenu && (
+          <div
+            className="absolute z-40 pointer-events-none"
+            style={{
+              left: Math.min(hoverPos.x + 12, (typeof window !== 'undefined' ? window.innerWidth - 240 : 400)),
+              top: hoverPos.y - 10,
+            }}
+          >
+            <div className="bg-card border rounded-lg shadow-lg p-2.5 w-[200px]">
+              <div className="font-semibold text-xs">{hoveredPerson.name}</div>
+              {hoveredPerson.nickname && <div className="text-[10px] text-muted-foreground">({hoveredPerson.nickname})</div>}
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getRelConfig(hoveredPerson.relationship_type).stroke }} />
+                <span className="text-[11px]" style={{ color: getRelConfig(hoveredPerson.relationship_type).stroke }}>
+                  {getRelConfig(hoveredPerson.relationship_type).label}
+                </span>
+              </div>
+              {hoveredPerson.related_period && (
+                <div className="text-[10px] text-muted-foreground mt-0.5">{hoveredPerson.related_period}</div>
+              )}
+              {hoveredPerson.notes && (
+                <div className="text-[10px] text-foreground/70 mt-1 line-clamp-2">{hoveredPerson.notes}</div>
+              )}
+            </div>
           </div>
         )}
 
