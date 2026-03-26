@@ -2,7 +2,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthStore } from '@/stores/auth-store'
-import { BookOpen, Settings, LogOut, Menu, FileText, Clock, MapPin, Users, UserPlus } from 'lucide-react'
+import { BookOpen, Settings, LogOut, Menu, FileText, Clock, MapPin, Users, UserPlus, Eye } from 'lucide-react'
+import type { LifeStoryShare } from '@/types'
 
 interface HeaderProps {
   onToggleSidebar: () => void
@@ -12,16 +13,17 @@ interface HeaderProps {
   onShowRelationships: () => void
   onShowSettings: () => void
   onShowInvitations: () => void
+  onShowShared: (share: LifeStoryShare) => void
   aiStatus: 'ok' | 'unknown' | 'error'
   storageStatus: 'ok' | 'error'
   pendingContribCount?: number
-  sharedWithMeCount?: number
+  incomingShares?: LifeStoryShare[]
 }
 
 export function Header({
   onToggleSidebar, onShowLifeStory, onShowTimeline, onShowMap,
-  onShowRelationships, onShowSettings, onShowInvitations,
-  aiStatus, storageStatus, pendingContribCount = 0,
+  onShowRelationships, onShowSettings, onShowInvitations, onShowShared,
+  aiStatus, storageStatus, pendingContribCount = 0, incomingShares = [],
 }: HeaderProps) {
   const { profile, signOut } = useAuthStore()
 
@@ -43,6 +45,28 @@ export function Header({
           <BookOpen className="w-5 h-5 text-primary" />
           <span className="font-semibold text-sm">Életút AI</span>
         </div>
+
+        {/* Shared life stories — prominent in header */}
+        {incomingShares.length > 0 && (
+          <div className="hidden sm:flex items-center gap-1 ml-3 border-l pl-3">
+            {incomingShares.map(share => (
+              <Tooltip key={share.id}>
+                <TooltipTrigger>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50"
+                    onClick={() => onShowShared(share)}
+                  >
+                    <Eye className="w-3 h-3" />
+                    {share.owner_name || 'Valaki'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{share.owner_name || 'Valaki'} életútja</TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-3 mr-4">

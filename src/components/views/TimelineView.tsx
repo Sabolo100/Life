@@ -99,6 +99,24 @@ const TRACKS: TrackDef[] = [
     textClass: 'text-cyan-700',
     categories: ['sport'],
   },
+  {
+    id: 'entertainment',
+    label: 'Szórakozás',
+    fill: '#8b5cf6',
+    bgFill: '#f5f3ff',
+    borderFill: '#7c3aed',
+    textClass: 'text-violet-700',
+    categories: ['entertainment', 'szórakozás', 'buli', 'party', 'concert', 'koncert', 'fesztivál', 'festival', 'mozi', 'cinema', 'hobby'],
+  },
+  {
+    id: 'other',
+    label: 'Egyéb',
+    fill: '#6b7280',
+    bgFill: '#f9fafb',
+    borderFill: '#4b5563',
+    textClass: 'text-gray-700',
+    categories: ['other', 'egyéb', 'misc'],
+  },
 ]
 
 const OTHER_TRACK: TrackDef = {

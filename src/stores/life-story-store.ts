@@ -62,7 +62,7 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
 
     // Normalize event categories to canonical values
     const rawEvents = (eventsRes.data as LifeEvent[]) || []
-    const VALID_CATEGORIES = ['career', 'education', 'relationship', 'family', 'residence', 'travel', 'health', 'sport', 'childhood']
+    const VALID_CATEGORIES = ['career', 'education', 'relationship', 'family', 'residence', 'travel', 'health', 'sport', 'childhood', 'entertainment', 'other']
     const CATEGORY_ALIASES: Record<string, string> = {
       work: 'career', munka: 'career', munkahely: 'career', karrier: 'career', job: 'career',
       állás: 'career', cég: 'career', foglalkozás: 'career', bank: 'career', hivatal: 'career',
@@ -79,6 +79,11 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
       egészség: 'health', betegség: 'health', kórház: 'health', hospital: 'health',
       illness: 'health', hardship: 'health',
       edzés: 'sport', fitness: 'sport', exercise: 'sport',
+      szórakozás: 'entertainment', buli: 'entertainment', party: 'entertainment',
+      koncert: 'entertainment', concert: 'entertainment', fesztivál: 'entertainment',
+      festival: 'entertainment', mozi: 'entertainment', cinema: 'entertainment',
+      hobby: 'entertainment', hobbi: 'entertainment',
+      egyéb: 'other', misc: 'other', other: 'other',
     }
 
     const eventsToUpdate: { id: string; category: string }[] = []

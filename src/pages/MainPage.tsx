@@ -88,10 +88,11 @@ export function MainPage() {
         onShowRelationships={() => toggleView('relationships')}
         onShowSettings={() => toggleView('settings')}
         onShowInvitations={() => toggleView('invitations')}
+        onShowShared={handleShowShared}
         aiStatus={aiStatus}
         storageStatus={storageStatus}
         pendingContribCount={pendingContribCount}
-        sharedWithMeCount={incomingShares.length}
+        incomingShares={incomingShares}
       />
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}

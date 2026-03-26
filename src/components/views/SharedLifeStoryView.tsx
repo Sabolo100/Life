@@ -415,7 +415,9 @@ export function SharedLifeStoryView({ share, onBack }: SharedLifeStoryViewProps)
                     <option value="education">Tanulmányok</option>
                     <option value="health">Egészség</option>
                     <option value="sport">Sport</option>
+                    <option value="entertainment">Szórakozás</option>
                     <option value="childhood">Gyermekkor</option>
+                    <option value="other">Egyéb</option>
                   </select>
                 </div>
               </div>
