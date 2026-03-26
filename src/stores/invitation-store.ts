@@ -275,86 +275,35 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
     set({ incomingShares: shares })
   },
 
-  // ── Guest: Accept invitation ──────────────────────────────────────
+  // ── Guest: Accept invitation (via Edge Function — bypasses RLS) ──
 
   acceptInvitation: async (token) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: 'Nem vagy bejelentkezve.' }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return { success: false, error: 'Nem vagy bejelentkezve.' }
 
-    // 1. Find invitation by token
-    const { data: invitation, error: findErr } = await supabase
-      .from('invitations')
-      .select('*')
-      .eq('token', token)
-      .single()
-
-    if (findErr || !invitation) {
-      return { success: false, error: 'A meghívó nem található vagy lejárt.' }
-    }
-
-    const inv = invitation as Invitation
-
-    // 2. Check if already accepted
-    if (inv.status === 'accepted') {
-      return { success: false, error: 'Ez a meghívó már el lett fogadva.' }
-    }
-
-    // 3. Check if expired
-    if (inv.expires_at && new Date(inv.expires_at) < new Date()) {
-      return { success: false, error: 'A meghívó lejárt.' }
-    }
-
-    // 4. Check email restriction
-    if (inv.invited_email && inv.invited_email !== user.email) {
-      return { success: false, error: 'Ez a meghívó másnak szól.' }
-    }
-
-    // 5. Can't accept own invitation
-    if (inv.user_id === user.id) {
-      return { success: false, error: 'Nem fogadhatod el saját meghívódat.' }
-    }
-
-    // 6. Check if share already exists
-    const { data: existingShare } = await supabase
-      .from('life_story_shares')
-      .select('id')
-      .eq('owner_id', inv.user_id)
-      .eq('shared_with_id', user.id)
-      .maybeSingle()
-
-    if (existingShare) {
-      return { success: false, error: 'Már hozzáférsz ehhez az életúthoz.' }
-    }
-
-    // 7. Create share
-    const { data: share, error: shareErr } = await supabase
-      .from('life_story_shares')
-      .insert({
-        owner_id: inv.user_id,
-        shared_with_id: user.id,
-        invitation_id: inv.id,
-        permission_level: inv.permission_level,
-        expires_at: inv.expires_at,
+    try {
+      const { data, error } = await supabase.functions.invoke('accept-invitation', {
+        body: { token },
       })
-      .select()
-      .single()
 
-    if (shareErr) {
-      console.error('[acceptInvitation] share error:', shareErr)
-      return { success: false, error: 'Hiba történt a hozzáférés létrehozásakor.' }
+      if (error) {
+        // Supabase functions.invoke wraps HTTP errors
+        const msg = (data as { error?: string })?.error || error.message || 'Hiba történt.'
+        return { success: false, error: msg }
+      }
+
+      if (!data?.success) {
+        return { success: false, error: data?.error || 'Ismeretlen hiba.' }
+      }
+
+      // Reload incoming shares so sidebar updates immediately
+      await get().loadIncomingShares()
+
+      return { success: true, share: data.share as LifeStoryShare }
+    } catch (err) {
+      console.error('[acceptInvitation] error:', err)
+      return { success: false, error: 'Hálózati hiba. Kérjük, próbáld újra.' }
     }
-
-    // 8. Update invitation status
-    await supabase
-      .from('invitations')
-      .update({
-        status: 'accepted',
-        accepted_at: new Date().toISOString(),
-        accepted_by: user.id,
-      })
-      .eq('id', inv.id)
-
-    return { success: true, share: share as LifeStoryShare }
   },
 
   // ── Guest: Add contribution ───────────────────────────────────────
