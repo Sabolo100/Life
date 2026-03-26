@@ -348,9 +348,14 @@ export function InvitationManager({ onBack }: InvitationManagerProps) {
                         {PERMISSION_LABELS[inv.permission_level].label}
                       </Badge>
                     </div>
-                    <span className="text-[10px] text-muted-foreground">
-                      {inv.accepted_at ? new Date(inv.accepted_at).toLocaleDateString('hu-HU') : ''}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground">
+                        {inv.accepted_at ? new Date(inv.accepted_at).toLocaleDateString('hu-HU') : ''}
+                      </span>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => revokeInvitation(inv.id)}>
+                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
