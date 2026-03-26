@@ -17,24 +17,39 @@ export default function App() {
     initialize()
   }, [initialize])
 
-  // Check URL for invite token
+  // ── Clean up Supabase auth redirect hash (#access_token=...) ──────
+  // After email confirmation, Supabase redirects back with the session
+  // token in the URL hash. The Supabase client picks it up automatically,
+  // but we need to clean the URL so the user doesn't see the raw token.
+  useEffect(() => {
+    if (window.location.hash && window.location.hash.includes('access_token')) {
+      // Let Supabase client process the hash first (it does this on init),
+      // then clean the URL after a brief delay
+      setTimeout(() => {
+        window.history.replaceState({}, '', window.location.pathname + window.location.search)
+      }, 100)
+    }
+  }, [])
+
+  // ── Check URL for invite token ────────────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const token = params.get('invite')
     if (token) {
       setInviteToken(token)
-      // Store in sessionStorage so it survives login/register
-      sessionStorage.setItem('invite_token', token)
+      // Store in localStorage so it survives the full email confirmation flow
+      // (sessionStorage is lost when Supabase redirects back after email confirm)
+      localStorage.setItem('invite_token', token)
       // Clean URL without reload
       window.history.replaceState({}, '', window.location.pathname)
     } else {
-      // Check sessionStorage (survives login flow)
-      const stored = sessionStorage.getItem('invite_token')
+      // Check localStorage (survives email confirmation redirect)
+      const stored = localStorage.getItem('invite_token')
       if (stored) setInviteToken(stored)
     }
   }, [])
 
-  // Process invite token after user is authenticated
+  // ── Process invite token after user is authenticated ──────────────
   useEffect(() => {
     if (!user || !inviteToken || inviteProcessing) return
 
@@ -46,7 +61,7 @@ export default function App() {
       } else {
         setInviteResult({ success: false, error: result.error })
       }
-      sessionStorage.removeItem('invite_token')
+      localStorage.removeItem('invite_token')
       setInviteToken(null)
       setInviteProcessing(false)
     }
