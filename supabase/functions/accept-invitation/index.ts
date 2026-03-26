@@ -5,117 +5,111 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+function respond(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Service role client — bypasses RLS
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-    // Get the calling user from the JWT
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Nincs autorizáció.' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    // Admin client — bypasses RLS
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false },
+    })
 
-    // Verify the user token
-    const supabaseUser = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    )
-    const { data: { user }, error: userErr } = await supabaseUser.auth.getUser()
+    // 1. Get caller's JWT from Authorization header
+    const authHeader = req.headers.get('Authorization') ?? ''
+    const jwt = authHeader.replace('Bearer ', '')
+    if (!jwt) return respond({ error: 'Nincs autorizáció.' }, 401)
+
+    // 2. Verify the JWT using admin client
+    const { data: { user }, error: userErr } = await admin.auth.getUser(jwt)
     if (userErr || !user) {
-      return new Response(JSON.stringify({ error: 'Érvénytelen token.' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      console.error('getUser error:', userErr)
+      return respond({ error: 'Érvénytelen session.' }, 401)
     }
 
-    const { token } = await req.json()
-    if (!token) {
-      return new Response(JSON.stringify({ error: 'Hiányzó meghívó token.' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    // 3. Parse body
+    let token: string
+    try {
+      const body = await req.json()
+      token = body?.token
+    } catch {
+      return respond({ error: 'Hibás kérés formátum.' }, 400)
     }
+    if (!token) return respond({ error: 'Hiányzó meghívó token.' }, 400)
 
-    // Find invitation by token
-    const { data: invitation, error: findErr } = await supabaseAdmin
+    console.log(`User ${user.email} accepting invitation token: ${token.slice(0, 8)}...`)
+
+    // 4. Find invitation by token
+    const { data: invitation, error: findErr } = await admin
       .from('invitations')
       .select('*')
       .eq('token', token)
       .single()
 
     if (findErr || !invitation) {
-      return new Response(JSON.stringify({ error: 'A meghívó nem található.' }), {
-        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      console.error('Invitation not found:', findErr)
+      return respond({ error: 'A meghívó nem található.' }, 404)
     }
 
-    // Checks
+    // 5. Validation checks
     if (invitation.status === 'accepted') {
-      return new Response(JSON.stringify({ error: 'Ez a meghívó már el lett fogadva.' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return respond({ error: 'Ez a meghívó már el lett fogadva.' }, 400)
     }
     if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
-      return new Response(JSON.stringify({ error: 'A meghívó lejárt.' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return respond({ error: 'A meghívó lejárt.' }, 400)
     }
     if (invitation.invited_email && invitation.invited_email !== user.email) {
-      return new Response(JSON.stringify({ error: 'Ez a meghívó másnak szól.' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return respond({ error: 'Ez a meghívó másnak szól.' }, 403)
     }
     if (invitation.user_id === user.id) {
-      return new Response(JSON.stringify({ error: 'Nem fogadhatod el saját meghívódat.' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return respond({ error: 'Nem fogadhatod el saját meghívódat.' }, 400)
     }
 
-    // Check if share already exists
-    const { data: existing } = await supabaseAdmin
+    // 6. Check if share already exists
+    const { data: existing } = await admin
       .from('life_story_shares')
-      .select('id')
+      .select('id, permission_level')
       .eq('owner_id', invitation.user_id)
       .eq('shared_with_id', user.id)
       .maybeSingle()
 
     if (existing) {
-      return new Response(JSON.stringify({ error: 'Már hozzáférsz ehhez az életúthoz.' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      // Already accepted — just return success so the UI proceeds normally
+      console.log('Share already exists, returning existing share')
+      return respond({ success: true, share: existing })
     }
 
-    // Create the share (service role bypasses RLS)
-    const { data: share, error: shareErr } = await supabaseAdmin
+    // 7. Create the share
+    const { data: share, error: shareErr } = await admin
       .from('life_story_shares')
       .insert({
         owner_id: invitation.user_id,
         shared_with_id: user.id,
         invitation_id: invitation.id,
         permission_level: invitation.permission_level,
-        expires_at: invitation.expires_at,
+        expires_at: invitation.expires_at ?? null,
       })
       .select()
       .single()
 
     if (shareErr) {
       console.error('Share insert error:', shareErr)
-      return new Response(JSON.stringify({ error: 'Hiba a hozzáférés létrehozásakor.' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return respond({ error: 'Hiba a hozzáférés létrehozásakor: ' + shareErr.message }, 500)
     }
 
-    // Update invitation status (service role bypasses RLS)
-    await supabaseAdmin
+    // 8. Update invitation status
+    const { error: updateErr } = await admin
       .from('invitations')
       .update({
         status: 'accepted',
@@ -124,14 +118,16 @@ Deno.serve(async (req) => {
       })
       .eq('id', invitation.id)
 
-    return new Response(JSON.stringify({ success: true, share }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    if (updateErr) {
+      console.error('Invitation update error (non-fatal):', updateErr)
+      // Non-fatal — share was created, that's the important part
+    }
+
+    console.log(`Invitation accepted: ${user.email} → owner ${invitation.user_id}`)
+    return respond({ success: true, share })
 
   } catch (err) {
-    console.error('accept-invitation error:', err)
-    return new Response(JSON.stringify({ error: 'Szerverhiba.' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    console.error('Unhandled error in accept-invitation:', err)
+    return respond({ error: 'Szerverhiba: ' + String(err) }, 500)
   }
 })

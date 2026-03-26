@@ -287,8 +287,18 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
       })
 
       if (error) {
-        // Supabase functions.invoke wraps HTTP errors
-        const msg = (data as { error?: string })?.error || error.message || 'Hiba történt.'
+        // Try to extract the actual error message from the response body
+        let msg = error.message
+        try {
+          // FunctionsHttpError has a context property with the response
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const ctx = (error as unknown as any).context
+          if (ctx) {
+            const body = await ctx.json()
+            msg = body?.error || msg
+          }
+        } catch { /* ignore parse error */ }
+        console.error('[acceptInvitation] function error:', msg)
         return { success: false, error: msg }
       }
 
