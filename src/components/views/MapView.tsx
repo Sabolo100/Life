@@ -163,8 +163,8 @@ export function MapView({ onBack }: MapViewProps) {
     setGeocodeError(prev => ({ ...prev, [loc.id]: '' }))
     try {
       await geocodeLocation(loc.id)
-      // After geocoding, fly to the new coords
-      const updated = locations.find(l => l.id === loc.id)
+      // After geocoding, read updated coords from the store (state may have changed)
+      const updated = useLifeStoryStore.getState().locations.find(l => l.id === loc.id)
       if (updated?.coordinates) setFlyTarget(updated.coordinates)
     } catch {
       setGeocodeError(prev => ({ ...prev, [loc.id]: 'Nem található' }))

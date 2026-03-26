@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthStore } from '@/stores/auth-store'
-import { BookOpen, Settings, LogOut, Menu, FileText, Clock, MapPin, Users } from 'lucide-react'
+import { BookOpen, Settings, LogOut, Menu, FileText, Clock, MapPin, Users, UserPlus } from 'lucide-react'
 
 interface HeaderProps {
   onToggleSidebar: () => void
@@ -10,11 +11,18 @@ interface HeaderProps {
   onShowMap: () => void
   onShowRelationships: () => void
   onShowSettings: () => void
+  onShowInvitations: () => void
   aiStatus: 'ok' | 'unknown' | 'error'
   storageStatus: 'ok' | 'error'
+  pendingContribCount?: number
+  sharedWithMeCount?: number
 }
 
-export function Header({ onToggleSidebar, onShowLifeStory, onShowTimeline, onShowMap, onShowRelationships, onShowSettings, aiStatus, storageStatus }: HeaderProps) {
+export function Header({
+  onToggleSidebar, onShowLifeStory, onShowTimeline, onShowMap,
+  onShowRelationships, onShowSettings, onShowInvitations,
+  aiStatus, storageStatus, pendingContribCount = 0,
+}: HeaderProps) {
   const { profile, signOut } = useAuthStore()
 
   const statusColor = (status: string) => {
@@ -92,6 +100,22 @@ export function Header({ onToggleSidebar, onShowLifeStory, onShowTimeline, onSho
             </Button>
           </TooltipTrigger>
           <TooltipContent>Kapcsolatok</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant="ghost" size="icon" onClick={onShowInvitations} className="relative">
+              <UserPlus className="w-4 h-4" />
+              {pendingContribCount > 0 && (
+                <Badge
+                  variant="destructive"
+                  className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] flex items-center justify-center"
+                >
+                  {pendingContribCount}
+                </Badge>
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Meghívók & Megosztás</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger>

@@ -5,6 +5,7 @@ export type QuestionType = 'incomplete_topic' | 'unresolved_event' | 'unclear_ti
 export type QuestionStatus = 'open' | 'addressed' | 'closed'
 export type SessionMode = 'free' | 'interview' | 'timeline' | 'family' | 'career'
 export type SessionGoal = 'childhood' | 'family' | 'career' | 'education' | 'relationships' | 'travel' | 'hardships' | 'fond_memories' | 'turning_points' | 'free'
+export type PerspectiveType = 'own_memory' | 'other_memory' | 'shared_memory' | 'disputed_memory'
 
 export interface Profile {
   id: string
@@ -75,6 +76,9 @@ export interface LifeEvent {
   narrative_text: string | null
   source_message_id: string | null
   source: 'self' | 'invited_person'
+  contributor_id: string | null
+  perspective_type: PerspectiveType | null
+  contribution_id: string | null
   created_at: string
 }
 
@@ -160,4 +164,69 @@ export interface AppSettings {
   ttsEnabled: boolean
   topicHints: boolean
   emotionalLayer: boolean
+}
+
+// ── Multi-user invitation & sharing types ─────────────────────────────
+
+export type PermissionLevel = 'reader' | 'commenter' | 'contributor' | 'editor'
+export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired'
+export type ContributionType = 'memory' | 'comment' | 'edit_suggestion'
+export type ContributionStatus = 'pending' | 'approved' | 'rejected' | 'modified'
+
+export interface Invitation {
+  id: string
+  user_id: string
+  invited_email: string | null
+  invited_name: string | null
+  token: string
+  permission_level: PermissionLevel
+  status: InvitationStatus
+  expires_at: string | null
+  accepted_at: string | null
+  accepted_by: string | null
+  created_at: string
+}
+
+export interface LifeStoryShare {
+  id: string
+  owner_id: string
+  shared_with_id: string
+  invitation_id: string | null
+  permission_level: PermissionLevel
+  expires_at: string | null
+  created_at: string
+  // Joined fields (from profiles)
+  owner_name?: string
+  shared_with_name?: string
+}
+
+export interface Contribution {
+  id: string
+  owner_id: string
+  contributor_id: string
+  contributor_name: string | null
+  contribution_type: ContributionType
+  target_entity_type: string | null
+  target_entity_id: string | null
+  title: string | null
+  content: Record<string, unknown>
+  perspective_type: PerspectiveType
+  status: ContributionStatus
+  reviewer_notes: string | null
+  created_at: string
+  reviewed_at: string | null
+}
+
+export const PERMISSION_LABELS: Record<PermissionLevel, { label: string; description: string }> = {
+  reader: { label: 'Csak olvasó', description: 'Megtekintheti az életutat' },
+  commenter: { label: 'Kommentelő', description: 'Olvashat + megjegyzéseket fűzhet' },
+  contributor: { label: 'Emlékek hozzáadása', description: 'Saját emlékeket adhat hozzá (jóváhagyásra vár)' },
+  editor: { label: 'Szerkesztő', description: 'Javításokat javasolhat (jóváhagyásra vár)' },
+}
+
+export const PERSPECTIVE_LABELS: Record<PerspectiveType, { label: string; badge: string }> = {
+  own_memory: { label: 'Saját emlékem', badge: '' },
+  other_memory: { label: 'Más emléke rólam', badge: 'emléke' },
+  shared_memory: { label: 'Közös emlék', badge: 'Közös emlék' },
+  disputed_memory: { label: 'Eltérő emlékek', badge: 'Eltérő emlékek' },
 }

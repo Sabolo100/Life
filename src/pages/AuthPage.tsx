@@ -7,7 +7,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuthStore } from '@/stores/auth-store'
 import { BookOpen } from 'lucide-react'
 
-export function AuthPage() {
+interface AuthPageProps {
+  inviteToken?: string | null
+}
+
+export function AuthPage({ inviteToken }: AuthPageProps) {
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [regEmail, setRegEmail] = useState('')
@@ -51,7 +55,11 @@ export function AuthPage() {
             </div>
           </div>
           <CardTitle className="text-2xl">Életút AI</CardTitle>
-          <CardDescription>Építsd fel az élettörténetedet AI segítségével</CardDescription>
+          <CardDescription>
+            {inviteToken
+              ? 'Jelentkezz be vagy regisztrálj a meghívó elfogadásához'
+              : 'Építsd fel az élettörténetedet AI segítségével'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {error && (

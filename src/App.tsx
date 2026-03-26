@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
+import { useInvitationStore } from '@/stores/invitation-store'
 import { AuthPage } from '@/pages/AuthPage'
 import { OnboardingPage } from '@/pages/OnboardingPage'
 import { MainPage } from '@/pages/MainPage'
@@ -7,10 +8,50 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 
 export default function App() {
   const { user, profile, loading, initialized, initialize } = useAuthStore()
+  const { acceptInvitation } = useInvitationStore()
+  const [inviteToken, setInviteToken] = useState<string | null>(null)
+  const [inviteResult, setInviteResult] = useState<{ success: boolean; error?: string; message?: string } | null>(null)
+  const [inviteProcessing, setInviteProcessing] = useState(false)
 
   useEffect(() => {
     initialize()
   }, [initialize])
+
+  // Check URL for invite token
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('invite')
+    if (token) {
+      setInviteToken(token)
+      // Store in sessionStorage so it survives login/register
+      sessionStorage.setItem('invite_token', token)
+      // Clean URL without reload
+      window.history.replaceState({}, '', window.location.pathname)
+    } else {
+      // Check sessionStorage (survives login flow)
+      const stored = sessionStorage.getItem('invite_token')
+      if (stored) setInviteToken(stored)
+    }
+  }, [])
+
+  // Process invite token after user is authenticated
+  useEffect(() => {
+    if (!user || !inviteToken || inviteProcessing) return
+
+    const process = async () => {
+      setInviteProcessing(true)
+      const result = await acceptInvitation(inviteToken)
+      if (result.success) {
+        setInviteResult({ success: true, message: 'Meghívó elfogadva! Most már hozzáférsz az életúthoz.' })
+      } else {
+        setInviteResult({ success: false, error: result.error })
+      }
+      sessionStorage.removeItem('invite_token')
+      setInviteToken(null)
+      setInviteProcessing(false)
+    }
+    process()
+  }, [user, inviteToken, acceptInvitation, inviteProcessing])
 
   if (!initialized || loading) {
     return (
@@ -25,8 +66,29 @@ export default function App() {
 
   return (
     <TooltipProvider>
+      {/* Invite result notification */}
+      {inviteResult && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[9999] px-4 py-3 rounded-xl shadow-xl border max-w-md ${
+          inviteResult.success
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-red-50 border-red-200 text-red-800'
+        }`}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">
+              {inviteResult.success ? inviteResult.message : inviteResult.error}
+            </span>
+            <button
+              onClick={() => setInviteResult(null)}
+              className="ml-2 text-current opacity-60 hover:opacity-100"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {!user ? (
-        <AuthPage />
+        <AuthPage inviteToken={inviteToken} />
       ) : profile && !profile.onboarding_completed ? (
         <OnboardingPage />
       ) : (

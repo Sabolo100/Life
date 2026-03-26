@@ -8,15 +8,19 @@ import { MapView } from '@/components/views/MapView'
 import { RelationshipView } from '@/components/views/RelationshipView'
 import { SettingsView } from '@/components/views/SettingsView'
 import { OpenQuestionsPanel } from '@/components/views/OpenQuestionsPanel'
+import { InvitationManager } from '@/components/views/InvitationManager'
+import { SharedLifeStoryView } from '@/components/views/SharedLifeStoryView'
 import { useChatStore } from '@/stores/chat-store'
 import { useLifeStoryStore } from '@/stores/life-story-store'
+import { useInvitationStore } from '@/stores/invitation-store'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { HelpCircle } from 'lucide-react'
+import type { LifeStoryShare } from '@/types'
 
-type View = 'chat' | 'lifeStory' | 'timeline' | 'map' | 'relationships' | 'settings'
+type View = 'chat' | 'lifeStory' | 'timeline' | 'map' | 'relationships' | 'settings' | 'invitations' | 'sharedStory'
 
 export function MainPage() {
   const [currentView, setCurrentView] = useState<View>('chat')
@@ -25,17 +29,26 @@ export function MainPage() {
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null)
   const [aiStatus] = useState<'ok' | 'unknown' | 'error'>('unknown')
   const [storageStatus] = useState<'ok' | 'error'>('ok')
+  const [selectedShare, setSelectedShare] = useState<LifeStoryShare | null>(null)
   const sessionInitialized = useRef(false)
 
   const { loadSessions, sessions, loading, createSession, currentSession } = useChatStore()
   const { loadAll, openQuestions } = useLifeStoryStore()
+  const {
+    loadInvitations, loadIncomingShares, loadContributions,
+    pendingContributions, incomingShares,
+  } = useInvitationStore()
 
   const openCount = openQuestions.filter(q => q.status === 'open').length
+  const pendingContribCount = pendingContributions.length
 
   useEffect(() => {
     loadSessions()
     loadAll()
-  }, [loadSessions, loadAll])
+    loadInvitations()
+    loadIncomingShares()
+    loadContributions()
+  }, [loadSessions, loadAll, loadInvitations, loadIncomingShares, loadContributions])
 
   useEffect(() => {
     if (loading) return
@@ -60,6 +73,11 @@ export function MainPage() {
 
   const toggleView = (view: View) => setCurrentView(currentView === view ? 'chat' : view)
 
+  const handleShowShared = (share: LifeStoryShare) => {
+    setSelectedShare(share)
+    setCurrentView('sharedStory')
+  }
+
   return (
     <div className="h-screen flex flex-col">
       <Header
@@ -69,13 +87,33 @@ export function MainPage() {
         onShowMap={() => toggleView('map')}
         onShowRelationships={() => toggleView('relationships')}
         onShowSettings={() => toggleView('settings')}
+        onShowInvitations={() => toggleView('invitations')}
         aiStatus={aiStatus}
         storageStatus={storageStatus}
+        pendingContribCount={pendingContribCount}
+        sharedWithMeCount={incomingShares.length}
       />
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
-        <div className="hidden md:block w-64 border-r bg-muted/30">
+        <div className="hidden md:flex md:flex-col w-64 border-r bg-muted/30">
           <SessionSidebar onSessionSelect={() => setCurrentView('chat')} />
+          {/* Shared with me section */}
+          {incomingShares.length > 0 && (
+            <div className="border-t px-3 py-2 shrink-0">
+              <p className="text-[10px] uppercase text-muted-foreground font-medium mb-1.5 px-1">
+                Megosztva velem
+              </p>
+              {incomingShares.map(share => (
+                <button
+                  key={share.id}
+                  onClick={() => handleShowShared(share)}
+                  className="w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-muted transition-colors truncate"
+                >
+                  {share.owner_name || 'Valaki'} életútja
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {/* Mobile sidebar */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
@@ -106,6 +144,12 @@ export function MainPage() {
           )}
           {currentView === 'settings' && (
             <SettingsView onBack={() => setCurrentView('chat')} />
+          )}
+          {currentView === 'invitations' && (
+            <InvitationManager onBack={() => setCurrentView('chat')} />
+          )}
+          {currentView === 'sharedStory' && selectedShare && (
+            <SharedLifeStoryView share={selectedShare} onBack={() => setCurrentView('chat')} />
           )}
           {/* Open Questions toggle button */}
           {!questionsPanelOpen && (

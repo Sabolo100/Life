@@ -352,7 +352,7 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
             </TabsContent>
             <TabsContent value="emotions" className="mt-0 space-y-3">
               {sortedEmotions.length === 0 ? (
-                <p className="text-center py-20 text-muted-foreground">Még nincsenek érzelmek rögzítve. Mesélj az AI-nak az élményeidről, és automatikusan felismeri az érzelmeket!</p>
+                <p className="text-center py-20 text-muted-foreground">Még nincsenek érzelmek rögzítve.</p>
               ) : sortedEmotions.map(emotion => {
                 const eventTitle = emotion.event_id ? eventTitleMap.get(emotion.event_id) : null
                 return (

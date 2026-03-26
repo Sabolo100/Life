@@ -362,7 +362,7 @@ export function TimelineView({ onBack }: TimelineViewProps) {
 
   // ── Derived layout values ─────────────────────────────────────────────────
 
-  const COLLAPSED_HEIGHT = 18 // thin strip for collapsed tracks
+  const COLLAPSED_HEIGHT = 22 // thin strip for collapsed tracks
   const svgWidth = totalYears * YEAR_WIDTH + LABEL_WIDTH + 20
 
   // Compute Y offset for each track (collapsed tracks get thin height)

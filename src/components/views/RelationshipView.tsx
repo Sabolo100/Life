@@ -553,7 +553,7 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
             <style>{`
               @keyframes dotPulse {
                 0%, 100% { transform: scale(1); opacity: 0.7; }
-                50% { transform: scale(1.35); opacity: 1; }
+                50% { transform: scale(1.7); opacity: 1; }
               }
               .dot-idle { animation: dotPulse 3s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
             `}</style>
