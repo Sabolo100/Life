@@ -12,8 +12,15 @@ interface ChatInputProps {
 }
 
 export function ChatInput({ onSend, disabled, pendingMessage, onPendingConsumed }: ChatInputProps) {
-  const [value, setValue] = useState('')
+  const [value, setValue] = useState(() => {
+    try { return localStorage.getItem('chat_draft') || '' } catch { return '' }
+  })
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Persist draft to localStorage
+  useEffect(() => {
+    try { localStorage.setItem('chat_draft', value) } catch { /* ignore */ }
+  }, [value])
 
   useEffect(() => {
     if (pendingMessage) {
@@ -35,6 +42,7 @@ export function ChatInput({ onSend, disabled, pendingMessage, onPendingConsumed 
     if (!trimmed || disabled) return
     onSend(trimmed)
     setValue('')
+    try { localStorage.removeItem('chat_draft') } catch { /* ignore */ }
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }

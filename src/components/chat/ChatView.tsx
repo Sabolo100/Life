@@ -8,6 +8,7 @@ import { ChatInput } from './ChatInput'
 import { SuggestionChips } from './SuggestionChips'
 import { BookOpen } from 'lucide-react'
 import { sendChatMessage } from '@/lib/ai-service'
+import { supabase } from '@/lib/supabase'
 import { speakText } from '@/lib/tts-service'
 
 interface ChatViewProps {
@@ -37,6 +38,17 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
 
   const handleSend = async (content: string) => {
     if (!currentSession || sending) return
+
+    // Ensure session is fresh before sending (handles long inactivity)
+    const { data: { session }, error: sessionErr } = await supabase.auth.getSession()
+    if (sessionErr || !session) {
+      // Try to refresh
+      const { error: refreshErr } = await supabase.auth.refreshSession()
+      if (refreshErr) {
+        await addMessage('⚠️ A munkamenet lejárt. Kérlek frissítsd az oldalt vagy jelentkezz be újra.', false)
+        return
+      }
+    }
 
     await addMessage(content, true)
     setSending(true)

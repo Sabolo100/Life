@@ -25,6 +25,9 @@ interface LifeStoryState {
   geocodeLocation: (locationId: string) => Promise<void>
   confirmLocation: (locationId: string) => Promise<void>
   updateLocationCoordinates: (locationId: string, coordinates: { lat: number; lng: number }) => Promise<void>
+  deleteLocation: (id: string) => Promise<void>
+  updateEvent: (id: string, updates: Partial<LifeEvent>) => Promise<void>
+  deleteEvent: (id: string) => Promise<void>
   addPerson: (person: Partial<Person>) => Promise<void>
   updatePerson: (id: string, updates: Partial<Person>) => Promise<void>
   deletePerson: (id: string) => Promise<void>
@@ -354,6 +357,39 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
     if (data) {
       set(state => ({ familyRelationships: [...state.familyRelationships, data as FamilyRelationship] }))
     }
+  },
+
+  deleteLocation: async (id) => {
+    // Clear location_id from any events referencing this location
+    const eventsToFix = get().events.filter(e => e.location_id === id)
+    for (const ev of eventsToFix) {
+      await supabase.from('events').update({ location_id: null }).eq('id', ev.id)
+    }
+    const { error } = await supabase.from('locations').delete().eq('id', id)
+    if (error) { console.error('[deleteLocation] error:', error); throw error }
+    set(state => ({
+      locations: state.locations.filter(l => l.id !== id),
+      events: state.events.map(e => e.location_id === id ? { ...e, location_id: null } : e),
+    }))
+  },
+
+  updateEvent: async (id, updates) => {
+    const { error } = await supabase.from('events').update(updates).eq('id', id)
+    if (error) { console.error('[updateEvent] error:', error); throw error }
+    set(state => ({
+      events: state.events.map(e => e.id === id ? { ...e, ...updates } : e),
+    }))
+  },
+
+  deleteEvent: async (id) => {
+    // Delete associated emotions
+    await supabase.from('emotions').delete().eq('event_id', id)
+    const { error } = await supabase.from('events').delete().eq('id', id)
+    if (error) { console.error('[deleteEvent] error:', error); throw error }
+    set(state => ({
+      events: state.events.filter(e => e.id !== id),
+      emotions: state.emotions.filter(em => em.event_id !== id),
+    }))
   },
 
   addPerson: async (person) => {

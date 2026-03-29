@@ -7,7 +7,21 @@ import { ArrowLeft, Users, MapPin, Calendar, Heart, Download, FileText, FileJson
 import { EmotionBadge } from './EmotionBadge'
 import { useAuthStore } from '@/stores/auth-store'
 import { exportAsJSON, exportAsPDF, exportAsDOCX } from '@/lib/export-service'
-import type { Person } from '@/types'
+import type { Person, LifeEvent } from '@/types'
+
+const CATEGORY_OPTIONS = [
+  { value: 'career', label: 'Munkahely' },
+  { value: 'education', label: 'Tanulmányok' },
+  { value: 'relationship', label: 'Kapcsolat' },
+  { value: 'family', label: 'Család' },
+  { value: 'residence', label: 'Lakóhely' },
+  { value: 'travel', label: 'Utazás' },
+  { value: 'health', label: 'Egészség' },
+  { value: 'sport', label: 'Sport' },
+  { value: 'entertainment', label: 'Szórakozás' },
+  { value: 'childhood', label: 'Gyermekkor' },
+  { value: 'other', label: 'Egyéb' },
+]
 
 interface LifeStoryViewProps {
   onBack: () => void
@@ -33,12 +47,15 @@ const EMPTY_PERSON: Partial<Person> = {
 }
 
 export function LifeStoryView({ onBack }: LifeStoryViewProps) {
-  const { lifeStory, persons, events, locations, timePeriods, emotions, openQuestions, addPerson, updatePerson, deletePerson } = useLifeStoryStore()
+  const { lifeStory, persons, events, locations, timePeriods, emotions, openQuestions, addPerson, updatePerson, deletePerson, updateEvent, deleteEvent } = useLifeStoryStore()
   const { profile } = useAuthStore()
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [editingPerson, setEditingPerson] = useState<Partial<Person> | null>(null)
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null) // null = adding new
   const [personSaving, setPersonSaving] = useState(false)
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
+  const [editingEvent, setEditingEvent] = useState<Partial<LifeEvent> | null>(null)
+  const [eventSaving, setEventSaving] = useState(false)
 
   const exportData = {
     lifeStory, persons, events, locations, timePeriods, emotions, openQuestions,
@@ -306,32 +323,197 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
             <TabsContent value="events" className="mt-0 space-y-3">
               {events.length === 0 ? (
                 <p className="text-center py-20 text-muted-foreground">Még nincsenek események az életutadban.</p>
-              ) : events.map(event => {
+              ) : (sortEventsByTime(events) as typeof events).map(event => {
                 const eventEmotions = emotionsByEventId.get(event.id) || []
+                const isEditing = editingEventId === event.id
+
+                if (isEditing && editingEvent) {
+                  return (
+                    <div key={event.id} className="border-2 border-primary rounded-lg p-3 space-y-2 bg-muted/30">
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={editingEvent.title || ''}
+                          onChange={e => setEditingEvent({ ...editingEvent, title: e.target.value })}
+                          placeholder="Cím"
+                          className="w-full text-sm font-medium border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary"
+                        />
+                        <div className="flex gap-2">
+                          <select
+                            value={editingEvent.category || ''}
+                            onChange={e => setEditingEvent({ ...editingEvent, category: e.target.value })}
+                            className="flex-1 text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary"
+                          >
+                            {CATEGORY_OPTIONS.map(o => (
+                              <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                          </select>
+                          <label className="flex items-center gap-1.5 text-xs">
+                            <input
+                              type="checkbox"
+                              checked={editingEvent.is_turning_point || false}
+                              onChange={e => setEditingEvent({ ...editingEvent, is_turning_point: e.target.checked })}
+                            />
+                            Fordulópont
+                          </label>
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={editingEvent.exact_date || ''}
+                            onChange={e => setEditingEvent({ ...editingEvent, exact_date: e.target.value || null, time_type: e.target.value ? 'exact_date' : editingEvent.time_type })}
+                            placeholder="Pontos dátum (ÉÉÉÉ-HH-NN)"
+                            className="flex-1 text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary font-mono"
+                          />
+                          <input
+                            type="number"
+                            value={editingEvent.estimated_year ?? ''}
+                            onChange={e => {
+                              const y = e.target.value ? parseInt(e.target.value) : null
+                              setEditingEvent({ ...editingEvent, estimated_year: y, time_type: y ? 'estimated_year' : editingEvent.time_type })
+                            }}
+                            placeholder="Év"
+                            className="w-20 text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary font-mono"
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          value={editingEvent.life_phase || ''}
+                          onChange={e => setEditingEvent({ ...editingEvent, life_phase: e.target.value || null })}
+                          placeholder="Időszak (pl. 2000-2010)"
+                          className="w-full text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary font-mono"
+                        />
+                        <textarea
+                          value={editingEvent.description || ''}
+                          onChange={e => setEditingEvent({ ...editingEvent, description: e.target.value || null })}
+                          placeholder="Leírás"
+                          rows={2}
+                          className="w-full text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary resize-none"
+                        />
+                        <textarea
+                          value={editingEvent.narrative_text || ''}
+                          onChange={e => setEditingEvent({ ...editingEvent, narrative_text: e.target.value || null })}
+                          placeholder="Elbeszélő szöveg (E/1)"
+                          rows={2}
+                          className="w-full text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary resize-none italic"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="text-xs"
+                          disabled={eventSaving || !editingEvent.title?.trim()}
+                          onClick={async () => {
+                            setEventSaving(true)
+                            try {
+                              const updates: Partial<LifeEvent> = {
+                                title: editingEvent.title,
+                                category: editingEvent.category,
+                                is_turning_point: editingEvent.is_turning_point,
+                                exact_date: editingEvent.exact_date,
+                                estimated_year: editingEvent.estimated_year,
+                                life_phase: editingEvent.life_phase,
+                                description: editingEvent.description,
+                                narrative_text: editingEvent.narrative_text,
+                              }
+                              // Set time_type based on what's filled
+                              if (editingEvent.exact_date) updates.time_type = 'exact_date'
+                              else if (editingEvent.estimated_year) updates.time_type = 'estimated_year'
+                              else if (editingEvent.life_phase) updates.time_type = 'life_phase'
+                              await updateEvent(event.id, updates)
+                              setEditingEventId(null)
+                              setEditingEvent(null)
+                            } catch (err) {
+                              console.error('Update event error:', err)
+                            } finally {
+                              setEventSaving(false)
+                            }
+                          }}
+                        >
+                          <Check className="w-3.5 h-3.5 mr-1" /> Mentés
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => { setEditingEventId(null); setEditingEvent(null) }}
+                        >
+                          <X className="w-3.5 h-3.5 mr-1" /> Mégse
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                }
+
                 return (
                   <div key={event.id} className="border rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-sm">{event.title}</span>
-                      <Badge variant="secondary" className="text-xs">{event.category}</Badge>
-                      {event.is_turning_point && <Badge variant="default" className="text-xs">Fordulópont</Badge>}
-                    </div>
-                    {event.narrative_text && <p className="text-xs mt-1 italic text-muted-foreground">{event.narrative_text}</p>}
-                    {event.description && <p className="text-xs mt-1">{event.description}</p>}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {event.exact_date || (event.estimated_year ? `~${event.estimated_year}` : event.life_phase || event.uncertain_time || 'Ismeretlen időpont')}
-                    </p>
-                    {eventEmotions.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {eventEmotions.map(emotion => (
-                          <EmotionBadge
-                            key={emotion.id}
-                            feeling={emotion.feeling}
-                            valence={emotion.valence}
-                            compact
-                          />
-                        ))}
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="font-medium text-sm">{event.title}</span>
+                          <Badge variant="secondary" className="text-xs">{CATEGORY_OPTIONS.find(c => c.value === event.category)?.label || event.category}</Badge>
+                          {event.is_turning_point && <Badge variant="default" className="text-xs">Fordulópont</Badge>}
+                        </div>
+                        {event.narrative_text && <p className="text-xs mt-1 italic text-muted-foreground">{event.narrative_text}</p>}
+                        {event.description && <p className="text-xs mt-1">{event.description}</p>}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {event.exact_date || (event.estimated_year ? `~${event.estimated_year}` : event.life_phase || event.uncertain_time || 'Ismeretlen időpont')}
+                        </p>
+                        {eventEmotions.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {eventEmotions.map(emotion => (
+                              <EmotionBadge
+                                key={emotion.id}
+                                feeling={emotion.feeling}
+                                valence={emotion.valence}
+                                compact
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
+                      <div className="flex gap-1 ml-2 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          title="Szerkesztés"
+                          onClick={() => {
+                            setEditingEventId(event.id)
+                            setEditingEvent({
+                              title: event.title,
+                              category: event.category,
+                              is_turning_point: event.is_turning_point,
+                              exact_date: event.exact_date,
+                              estimated_year: event.estimated_year,
+                              life_phase: event.life_phase,
+                              time_type: event.time_type,
+                              description: event.description,
+                              narrative_text: event.narrative_text,
+                            })
+                          }}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 hover:text-destructive"
+                          title="Törlés"
+                          onClick={async () => {
+                            if (confirm(`Biztosan törölni szeretnéd "${event.title}" eseményt?`)) {
+                              try {
+                                await deleteEvent(event.id)
+                              } catch (err) {
+                                console.error('Delete event error:', err)
+                              }
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 )
               })}

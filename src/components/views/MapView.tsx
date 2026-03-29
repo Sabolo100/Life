@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, MapPin, Search, Loader2, Check, X, Navigation, ChevronDown, ChevronUp, Edit2 } from 'lucide-react'
+import { ArrowLeft, MapPin, Search, Loader2, Check, X, Navigation, ChevronDown, ChevronUp, Edit2, Trash2 } from 'lucide-react'
 import type { Location } from '@/types'
 
 // Fix Leaflet default icon issue with bundlers
@@ -94,7 +94,7 @@ function FitBounds({ locations }: { locations: Location[] }) {
 interface MapViewProps { onBack: () => void }
 
 export function MapView({ onBack }: MapViewProps) {
-  const { locations, geocodeLocation, confirmLocation, updateLocationCoordinates } = useLifeStoryStore()
+  const { locations, geocodeLocation, confirmLocation, updateLocationCoordinates, deleteLocation } = useLifeStoryStore()
 
   // Selected location panel
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -130,7 +130,6 @@ export function MapView({ onBack }: MapViewProps) {
   const handleDragEnd = async (locId: string, e: L.DragEndEvent) => {
     const { lat, lng } = (e.target as L.Marker).getLatLng()
     await updateLocationCoordinates(locId, { lat, lng })
-    // If this is the selected one, update flyTarget so panel shows fresh coords
     if (locId === selectedId) {
       setFlyTarget({ lat, lng })
     }
@@ -139,12 +138,24 @@ export function MapView({ onBack }: MapViewProps) {
   const handleConfirm = async () => {
     if (!selectedLocation?.coordinates) return
     await confirmLocation(selectedLocation.id)
+    setSelectedId(null) // Close popup after confirm
   }
 
   const handleEditConfirmed = async () => {
     if (!selectedLocation) return
     await updateLocationCoordinates(selectedLocation.id, selectedLocation.coordinates!)
-    // coordinates_confirmed becomes false via store → marker turns orange
+  }
+
+  const handleDelete = async (locId: string) => {
+    const loc = locations.find(l => l.id === locId)
+    if (!loc) return
+    if (!confirm(`Biztosan törölni szeretnéd "${loc.name}" helyszínt?`)) return
+    if (selectedId === locId) setSelectedId(null)
+    try {
+      await deleteLocation(locId)
+    } catch (err) {
+      console.error('Delete location error:', err)
+    }
   }
 
   const handleGpsApply = async () => {
@@ -163,7 +174,6 @@ export function MapView({ onBack }: MapViewProps) {
     setGeocodeError(prev => ({ ...prev, [loc.id]: '' }))
     try {
       await geocodeLocation(loc.id)
-      // After geocoding, read updated coords from the store (state may have changed)
       const updated = useLifeStoryStore.getState().locations.find(l => l.id === loc.id)
       if (updated?.coordinates) setFlyTarget(updated.coordinates)
     } catch {
@@ -226,7 +236,7 @@ export function MapView({ onBack }: MapViewProps) {
               >
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  url="https://tile.openstreetmap.de/{z}/{x}/{y}.png"
                 />
                 <FitBounds locations={locationsWithCoords} />
                 <FlyTo target={flyTarget} />
@@ -269,12 +279,21 @@ export function MapView({ onBack }: MapViewProps) {
                       <p className="text-xs text-muted-foreground mt-0.5 ml-5">{selectedLocation.related_period}</p>
                     )}
                   </div>
-                  <button
-                    onClick={() => setSelectedId(null)}
-                    className="ml-2 p-1 hover:text-destructive flex-shrink-0"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                    <button
+                      onClick={() => handleDelete(selectedLocation.id)}
+                      className="p-1 hover:text-destructive"
+                      title="Helyszín törlése"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setSelectedId(null)}
+                      className="p-1 hover:text-destructive"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {selectedLocation.coordinates && (
@@ -407,6 +426,15 @@ export function MapView({ onBack }: MapViewProps) {
                             }}
                           >
                             GPS
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs h-7 px-2 hover:text-destructive"
+                            onClick={() => handleDelete(loc.id)}
+                            title="Törlés"
+                          >
+                            <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>
                       </div>
