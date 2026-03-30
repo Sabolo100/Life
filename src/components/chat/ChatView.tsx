@@ -94,6 +94,44 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
         await upsertEntities(response.extractedEntities)
       }
 
+      // Retry extraction if user message was substantial but Recorder found nothing.
+      // This catches cases where the dual-agent call succeeded but Recorder missed facts.
+      const noEntities = !response.extractedEntities ||
+        (response.extractedEntities.events.length === 0 &&
+         response.extractedEntities.persons.length === 0 &&
+         response.extractedEntities.locations.length === 0)
+      if (noEntities && content.length > 150) {
+        console.log('[ChatView] Substantial message with no entities — scheduling extraction retry in 3s')
+        setTimeout(async () => {
+          try {
+            console.log('[ChatView] Extraction retry: re-sending recent messages to Recorder')
+            const retryResponse = await sendChatMessage({
+              messages: recentMessages,
+              openQuestions: [],
+              mode: currentSession.mode,
+              goal: currentSession.goal,
+              aiModel,
+              emotionalLayer: false,
+              userId: profile?.id,
+              messageCount: messages.length,
+            })
+            if (retryResponse.extractedEntities) {
+              const total = retryResponse.extractedEntities.events.length +
+                retryResponse.extractedEntities.persons.length +
+                retryResponse.extractedEntities.locations.length
+              if (total > 0) {
+                console.log(`[ChatView] Retry found ${total} entities — upserting`)
+                await upsertEntities(retryResponse.extractedEntities)
+              } else {
+                console.log('[ChatView] Retry also found 0 entities — giving up')
+              }
+            }
+          } catch (retryErr) {
+            console.warn('[ChatView] Extraction retry failed silently:', retryErr)
+          }
+        }, 3000)
+      }
+
       if (response.openQuestions?.length) {
         await updateOpenQuestions(response.openQuestions)
       }

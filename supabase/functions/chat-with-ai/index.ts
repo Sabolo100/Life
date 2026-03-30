@@ -87,13 +87,14 @@ function buildRecorderPrompt(
     ? `Létező személy nevek (ha már létezik, PONTOSAN ezt a nevet használd): ${existingPersonNames.join(', ')}`
     : ''
 
-  const contextMessages = recentMessages.slice(-4).map(m =>
+  const contextMessages = recentMessages.slice(-10).map(m =>
     `${m.role === 'user' ? 'Felhasználó' : 'AI'}: ${m.content}`
   ).join('\n')
 
-  return `Te egy precíz magyar nyelvű adatrögzítő AI vagy. A felhasználó üzenetéből kinyered a tényeket és strukturált adatokká alakítod.
+  return `Te egy precíz magyar nyelvű adatrögzítő AI vagy. A felhasználó üzeneteiből kinyered a tényeket és strukturált adatokká alakítod.
 
 SZABÁLYOK:
+- A felhasználó ÖSSZES üzenetéből gyűjts ki tényeket (nem csak az utolsóból!) — ha több üzeneten át mesélt egy témáról, az összeset figyelembe kell venni
 - Csak a felhasználó által MONDOTT tényeket rögzítsd, NE az AI kérdéseit
 - Ha meglévő event-et pontosít, PONTOSAN ugyanazt a title-t használd
 - narrative_text: 1-3 mondat, EGYES SZÁM ELSŐ SZEMÉLYBEN, életrajzi stílus, múlt idő. Példa: "1970. április 11-én születtem Budapesten. Általános iskolába a Fáy András iskolába jártam." Másik példa: "2016-ban született Márton fiam."
@@ -424,7 +425,9 @@ Deno.serve(async (req) => {
 
     // Build prompts
     const recorderPrompt = buildRecorderPrompt(existingTitles, existingData.locationNames, existingData.personNames, chatMessages)
-    const recorderMessages = chatMessages.slice(-5) // last 5 messages for recorder
+    // Recorder gets last 10 messages — enough context for multi-message storytelling
+    // Always ensure the last user message is included
+    const recorderMessages = chatMessages.slice(-10)
 
     const filteredSummaries = filterEventsForInterviewer(existingData.events, request.mode, request.goal)
     const interviewerPrompt = buildInterviewerPrompt(request, filteredSummaries)
