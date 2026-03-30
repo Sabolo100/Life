@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
+import { localDb, isLocalMode } from '@/lib/local-db'
 import type { ChatSession, Message, SessionMode, SessionGoal } from '@/types'
 
 interface ChatState {
@@ -27,6 +28,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   loadSessions: async () => {
     set({ loading: true })
+
+    if (isLocalMode()) {
+      const sessions = localDb.getAll<ChatSession>('chat_sessions')
+      sessions.sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
+      set({ sessions, loading: false })
+      return
+    }
+
     const { data } = await supabase
       .from('chat_sessions')
       .select('*')
@@ -35,6 +44,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   createSession: async (mode, goal) => {
+    if (isLocalMode()) {
+      const session: ChatSession = {
+        id: localDb.genId(),
+        user_id: 'local',
+        title: 'Új beszélgetés',
+        mode,
+        goal,
+        created_at: localDb.now(),
+        updated_at: localDb.now(),
+      } as ChatSession
+      localDb.upsert('chat_sessions', session)
+      set(state => ({ sessions: [session, ...state.sessions], currentSession: session, messages: [] }))
+      return session
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
     const { data } = await supabase
@@ -64,8 +88,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   deleteSession: async (sessionId) => {
-    await supabase.from('messages').delete().eq('session_id', sessionId)
-    await supabase.from('chat_sessions').delete().eq('id', sessionId)
+    if (isLocalMode()) {
+      localDb.removeWhere('messages', m => m.session_id === sessionId)
+      localDb.remove('chat_sessions', sessionId)
+    } else {
+      await supabase.from('messages').delete().eq('session_id', sessionId)
+      await supabase.from('chat_sessions').delete().eq('id', sessionId)
+    }
     set(state => ({
       sessions: state.sessions.filter(s => s.id !== sessionId),
       currentSession: state.currentSession?.id === sessionId ? null : state.currentSession,
@@ -76,10 +105,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   updateSessionTitle: async (sessionId, title) => {
     const trimmed = title.trim()
     if (!trimmed) return
-    await supabase
-      .from('chat_sessions')
-      .update({ title: trimmed })
-      .eq('id', sessionId)
+
+    if (isLocalMode()) {
+      localDb.update<ChatSession>('chat_sessions', sessionId, { title: trimmed } as Partial<ChatSession>)
+    } else {
+      await supabase
+        .from('chat_sessions')
+        .update({ title: trimmed })
+        .eq('id', sessionId)
+    }
+
     set(state => ({
       sessions: state.sessions.map(s => s.id === sessionId ? { ...s, title: trimmed } : s),
       currentSession: state.currentSession?.id === sessionId
@@ -91,6 +126,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
   addMessage: async (content, isUser) => {
     const session = get().currentSession
     if (!session) return null
+
+    if (isLocalMode()) {
+      const message: Message = {
+        id: localDb.genId(),
+        session_id: session.id,
+        user_id: 'local',
+        content,
+        is_user: isUser,
+        draft: false,
+        created_at: localDb.now(),
+      } as Message
+      localDb.upsert('messages', message)
+      set(state => ({ messages: [...state.messages, message] }))
+      localDb.update<ChatSession>('chat_sessions', session.id, { updated_at: localDb.now() } as Partial<ChatSession>)
+      return message
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
     const { data } = await supabase
@@ -107,7 +159,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (data) {
       const message = data as Message
       set(state => ({ messages: [...state.messages, message] }))
-      // Update session timestamp
       await supabase
         .from('chat_sessions')
         .update({ updated_at: new Date().toISOString() })
@@ -118,6 +169,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   loadMessages: async (sessionId) => {
+    if (isLocalMode()) {
+      const allMessages = localDb.getAll<Message>('messages')
+      const sessionMessages = allMessages
+        .filter(m => m.session_id === sessionId && !m.draft)
+        .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''))
+      set({ messages: sessionMessages })
+      return
+    }
+
     const { data } = await supabase
       .from('messages')
       .select('*')

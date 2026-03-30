@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
+import { localDb, isLocalMode } from '@/lib/local-db'
 import type { LifeStory, Person, LifeEvent, Location, TimePeriod, Emotion, OpenQuestion, FamilyRelationship, FamilyRelType } from '@/types'
 
 interface LifeStoryState {
@@ -36,6 +37,84 @@ interface LifeStoryState {
   removeFamilyRelationship: (id: string) => Promise<void>
 }
 
+// ── Category normalization ─────────────────────────────────────────────────
+const VALID_CATEGORIES = ['career', 'education', 'relationship', 'family', 'residence', 'travel', 'health', 'sport', 'childhood', 'entertainment', 'other']
+const CATEGORY_ALIASES: Record<string, string> = {
+  work: 'career', munka: 'career', munkahely: 'career', karrier: 'career', job: 'career',
+  állás: 'career', cég: 'career', foglalkozás: 'career', bank: 'career', hivatal: 'career',
+  iskola: 'education', egyetem: 'education', tanulmányok: 'education', school: 'education',
+  tanulás: 'education', képzés: 'education', study: 'education',
+  kapcsolat: 'relationship', házasság: 'relationship', marriage: 'relationship',
+  partner: 'relationship', love: 'relationship', válás: 'relationship',
+  család: 'family', születés: 'family', birth: 'family', loss: 'family',
+  halál: 'family', gyerek: 'family', child: 'family',
+  gyermekkor: 'childhood', gyerekkor: 'childhood',
+  lakóhely: 'residence', költözés: 'residence', lakás: 'residence', ház: 'residence',
+  otthon: 'residence', home: 'residence', moving: 'residence',
+  utazás: 'travel', trip: 'travel', nyaralás: 'travel', kirándulás: 'travel', vacation: 'travel',
+  egészség: 'health', betegség: 'health', kórház: 'health', hospital: 'health',
+  illness: 'health', hardship: 'health',
+  edzés: 'sport', fitness: 'sport', exercise: 'sport',
+  szórakozás: 'entertainment', buli: 'entertainment', party: 'entertainment',
+  koncert: 'entertainment', concert: 'entertainment', fesztivál: 'entertainment',
+  festival: 'entertainment', mozi: 'entertainment', cinema: 'entertainment',
+  hobby: 'entertainment', hobbi: 'entertainment',
+  egyéb: 'other', misc: 'other', other: 'other',
+}
+
+function normalizeCategory(cat: string): string {
+  const lower = (cat || '').toLowerCase().trim()
+  if (VALID_CATEGORIES.includes(lower)) return lower
+  const alias = CATEGORY_ALIASES[lower]
+  if (alias) return alias
+  for (const [key, target] of Object.entries(CATEGORY_ALIASES)) {
+    if (lower.includes(key) || key.includes(lower)) return target
+  }
+  return lower
+}
+
+function normalizeEvents(events: LifeEvent[]): LifeEvent[] {
+  return events.map(ev => {
+    const newCat = normalizeCategory(ev.category)
+    return newCat !== ev.category ? { ...ev, category: newCat } : ev
+  })
+}
+
+/** Sanitize event dates and extract years from text fields */
+function sanitizeEventDates(event: Partial<LifeEvent>): Partial<LifeEvent> {
+  const e = { ...event }
+
+  // Sanitize exact_date: must be YYYY-MM-DD format
+  if (e.exact_date && !/^\d{4}-\d{2}-\d{2}$/.test(e.exact_date as string)) {
+    const yearMatch = (e.exact_date as string).match(/(\d{4})/)
+    if (yearMatch) {
+      e.estimated_year = parseInt(yearMatch[1])
+      e.life_phase = e.life_phase || (e.exact_date as string)
+      e.time_type = 'estimated_year'
+    }
+    e.exact_date = null
+  }
+
+  // Ensure estimated_year is filled if we have a year anywhere
+  if (!e.estimated_year || (e.estimated_year as number) < 1800) {
+    const sources = [e.life_phase, e.description, e.uncertain_time]
+    for (const src of sources) {
+      if (!src) continue
+      const m = (src as string).match(/(\d{4})/)
+      if (m) {
+        const y = parseInt(m[1])
+        if (y > 1800 && y < 2100) {
+          e.estimated_year = y
+          e.time_type = e.time_type === 'life_phase' || e.time_type === 'uncertain' ? 'estimated_year' : (e.time_type || 'estimated_year')
+          break
+        }
+      }
+    }
+  }
+
+  return e
+}
+
 export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   lifeStory: null,
   persons: [],
@@ -49,6 +128,22 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
 
   loadAll: async () => {
     set({ loading: true })
+
+    if (isLocalMode()) {
+      set({
+        lifeStory: localDb.getLifeStory() as LifeStory | null,
+        persons: localDb.getAll<Person>('persons'),
+        events: normalizeEvents(localDb.getAll<LifeEvent>('events')),
+        locations: localDb.getAll<Location>('locations'),
+        timePeriods: localDb.getAll<TimePeriod>('time_periods'),
+        emotions: localDb.getAll<Emotion>('emotions'),
+        openQuestions: localDb.getAll<OpenQuestion>('open_questions').filter(q => q.status === 'open'),
+        familyRelationships: localDb.getAll<FamilyRelationship>('family_relationships'),
+        loading: false,
+      })
+      return
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { set({ loading: false }); return }
 
@@ -63,57 +158,13 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
       supabase.from('family_relationships').select('*').eq('user_id', user.id),
     ])
 
-    // Normalize event categories to canonical values
     const rawEvents = (eventsRes.data as LifeEvent[]) || []
-    const VALID_CATEGORIES = ['career', 'education', 'relationship', 'family', 'residence', 'travel', 'health', 'sport', 'childhood', 'entertainment', 'other']
-    const CATEGORY_ALIASES: Record<string, string> = {
-      work: 'career', munka: 'career', munkahely: 'career', karrier: 'career', job: 'career',
-      állás: 'career', cég: 'career', foglalkozás: 'career', bank: 'career', hivatal: 'career',
-      iskola: 'education', egyetem: 'education', tanulmányok: 'education', school: 'education',
-      tanulás: 'education', képzés: 'education', study: 'education',
-      kapcsolat: 'relationship', házasság: 'relationship', marriage: 'relationship',
-      partner: 'relationship', love: 'relationship', válás: 'relationship',
-      család: 'family', születés: 'family', birth: 'family', loss: 'family',
-      halál: 'family', gyerek: 'family', child: 'family',
-      gyermekkor: 'childhood', gyerekkor: 'childhood',
-      lakóhely: 'residence', költözés: 'residence', lakás: 'residence', ház: 'residence',
-      otthon: 'residence', home: 'residence', moving: 'residence',
-      utazás: 'travel', trip: 'travel', nyaralás: 'travel', kirándulás: 'travel', vacation: 'travel',
-      egészség: 'health', betegség: 'health', kórház: 'health', hospital: 'health',
-      illness: 'health', hardship: 'health',
-      edzés: 'sport', fitness: 'sport', exercise: 'sport',
-      szórakozás: 'entertainment', buli: 'entertainment', party: 'entertainment',
-      koncert: 'entertainment', concert: 'entertainment', fesztivál: 'entertainment',
-      festival: 'entertainment', mozi: 'entertainment', cinema: 'entertainment',
-      hobby: 'entertainment', hobbi: 'entertainment',
-      egyéb: 'other', misc: 'other', other: 'other',
-    }
-
-    const eventsToUpdate: { id: string; category: string }[] = []
-    const normalizedEvents = rawEvents.map(ev => {
-      const cat = (ev.category || '').toLowerCase().trim()
-      if (VALID_CATEGORIES.includes(cat)) return ev // already valid
-
-      // Try alias map
-      let newCat = CATEGORY_ALIASES[cat]
-      // Try partial match
-      if (!newCat) {
-        for (const [alias, target] of Object.entries(CATEGORY_ALIASES)) {
-          if (cat.includes(alias) || alias.includes(cat)) { newCat = target; break }
-        }
-      }
-      if (newCat && newCat !== ev.category) {
-        eventsToUpdate.push({ id: ev.id, category: newCat })
-        return { ...ev, category: newCat }
-      }
-      return ev
-    })
+    const normalizedEvents = normalizeEvents(rawEvents)
 
     // Batch update mis-categorized events in DB (fire-and-forget)
-    if (eventsToUpdate.length > 0) {
-      for (const { id, category } of eventsToUpdate) {
-        supabase.from('events').update({ category }).eq('id', id).then(() => {})
-      }
+    const eventsToUpdate = normalizedEvents.filter((ev, i) => ev.category !== rawEvents[i]?.category)
+    for (const ev of eventsToUpdate) {
+      supabase.from('events').update({ category: ev.category }).eq('id', ev.id).then(() => {})
     }
 
     set({
@@ -130,6 +181,16 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   updateLifeStory: async (content) => {
+    if (isLocalMode()) {
+      const existing = get().lifeStory
+      const story = existing
+        ? { ...existing, content, last_updated: localDb.now() }
+        : { id: localDb.genId(), content, title: 'Az én életutam', created_at: localDb.now(), last_updated: localDb.now() }
+      localDb.setLifeStory(story)
+      set({ lifeStory: story as LifeStory })
+      return
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -153,103 +214,90 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   upsertEntities: async (entities) => {
+    if (isLocalMode()) {
+      const userId = 'local'
+
+      if (entities.persons?.length) {
+        for (const p of entities.persons) {
+          const existing = localDb.getAll<Person>('persons').find(ep => ep.name === p.name)
+          if (existing) {
+            localDb.update<Person>('persons', existing.id, { ...p } as Partial<Person>)
+          } else {
+            localDb.upsert('persons', { ...p, id: localDb.genId(), user_id: userId, created_at: localDb.now() })
+          }
+        }
+      }
+      if (entities.events?.length) {
+        for (const e of entities.events) {
+          const sanitized = sanitizeEventDates(e)
+          const existing = localDb.getAll<LifeEvent>('events').find(ee => ee.title === e.title)
+          if (existing) {
+            localDb.update<LifeEvent>('events', existing.id, { ...sanitized } as Partial<LifeEvent>)
+          } else {
+            localDb.upsert('events', { ...sanitized, id: localDb.genId(), user_id: userId, created_at: localDb.now() })
+          }
+        }
+      }
+      if (entities.locations?.length) {
+        for (const l of entities.locations) {
+          const existing = localDb.getAll<Location>('locations').find(el => el.name === l.name)
+          if (existing) {
+            localDb.update<Location>('locations', existing.id, { ...l } as Partial<Location>)
+          } else {
+            localDb.upsert('locations', { ...l, id: localDb.genId(), user_id: userId })
+          }
+        }
+      }
+      if (entities.timePeriods?.length) {
+        for (const t of entities.timePeriods) {
+          const existing = localDb.getAll<TimePeriod>('time_periods').find(et => et.label === (t as { label?: string }).label)
+          if (existing) {
+            localDb.update<TimePeriod>('time_periods', existing.id, { ...t } as Partial<TimePeriod>)
+          } else {
+            localDb.upsert('time_periods', { ...t, id: localDb.genId(), user_id: userId })
+          }
+        }
+      }
+      if (entities.emotions?.length) {
+        for (const em of entities.emotions) {
+          localDb.upsert('emotions', { ...em, id: localDb.genId(), user_id: userId })
+        }
+      }
+
+      await get().loadAll()
+      return
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       console.error('[upsertEntities] No authenticated user!')
       return
     }
 
-    console.log('[upsertEntities] Starting upsert for user:', user.id, 'Entities:', {
-      persons: entities.persons?.length || 0,
-      events: entities.events?.length || 0,
-      locations: entities.locations?.length || 0,
-      emotions: entities.emotions?.length || 0,
-    })
-
     if (entities.persons?.length) {
       const toInsert = entities.persons.map(p => ({ ...p, user_id: user.id }))
       const { error } = await supabase.from('persons').upsert(toInsert as Person[], { onConflict: 'user_id,name' })
       if (error) console.error('[upsertEntities] persons error:', error)
-      else console.log('[upsertEntities] persons upserted:', toInsert.length)
     }
     if (entities.events?.length) {
-      const toInsert = entities.events.map(e => {
-        const event = { ...e, user_id: user.id }
-
-        // Sanitize exact_date: must be YYYY-MM-DD format, otherwise move to estimated_year
-        if (event.exact_date && !/^\d{4}-\d{2}-\d{2}$/.test(event.exact_date as string)) {
-          const yearMatch = (event.exact_date as string).match(/(\d{4})/)
-          if (yearMatch) {
-            event.estimated_year = parseInt(yearMatch[1])
-            event.life_phase = event.life_phase || (event.exact_date as string)
-            event.time_type = 'estimated_year'
-          }
-          event.exact_date = null
-          console.log('[upsertEntities] Sanitized invalid exact_date to estimated_year:', event.estimated_year)
-        }
-
-        // Ensure estimated_year is filled if we have a year anywhere
-        if (!event.estimated_year || (event.estimated_year as number) < 1800) {
-          // Try to extract from life_phase (e.g. "2000-2010", "2000")
-          if (event.life_phase) {
-            const m = (event.life_phase as string).match(/(\d{4})/)
-            if (m) {
-              event.estimated_year = parseInt(m[1])
-              if (event.time_type === 'life_phase' || event.time_type === 'uncertain') {
-                event.time_type = 'estimated_year'
-              }
-              console.log('[upsertEntities] Extracted year from life_phase:', event.estimated_year)
-            }
-          }
-          // Try from description
-          if ((!event.estimated_year || (event.estimated_year as number) < 1800) && event.description) {
-            const m = (event.description as string).match(/(\d{4})/)
-            if (m) {
-              const y = parseInt(m[1])
-              if (y > 1800 && y < 2100) {
-                event.estimated_year = y
-                event.time_type = 'estimated_year'
-                console.log('[upsertEntities] Extracted year from description:', y)
-              }
-            }
-          }
-          // Try from uncertain_time
-          if ((!event.estimated_year || (event.estimated_year as number) < 1800) && event.uncertain_time) {
-            const m = (event.uncertain_time as string).match(/(\d{4})/)
-            if (m) {
-              const y = parseInt(m[1])
-              if (y > 1800 && y < 2100) {
-                event.estimated_year = y
-                event.time_type = 'estimated_year'
-                console.log('[upsertEntities] Extracted year from uncertain_time:', y)
-              }
-            }
-          }
-        }
-
-        return event
-      })
+      const toInsert = entities.events.map(e => sanitizeEventDates({ ...e, user_id: user.id }))
       const { error } = await supabase.from('events').upsert(toInsert as LifeEvent[], { onConflict: 'user_id,title' })
       if (error) console.error('[upsertEntities] events error:', error)
-      else console.log('[upsertEntities] events upserted:', toInsert.length)
     }
     if (entities.locations?.length) {
       const toInsert = entities.locations.map(l => ({ ...l, user_id: user.id }))
       const { error } = await supabase.from('locations').upsert(toInsert as Location[], { onConflict: 'user_id,name' })
       if (error) console.error('[upsertEntities] locations error:', error)
-      else console.log('[upsertEntities] locations upserted:', toInsert.length)
     }
     if (entities.timePeriods?.length) {
       const toInsert = entities.timePeriods.map(t => ({ ...t, user_id: user.id }))
       const { error } = await supabase.from('time_periods').upsert(toInsert as TimePeriod[], { onConflict: 'user_id,label' })
       if (error) console.error('[upsertEntities] timePeriods error:', error)
-      else console.log('[upsertEntities] timePeriods upserted:', toInsert.length)
     }
     if (entities.emotions?.length) {
       const toInsert = entities.emotions.map(e => ({ ...e, user_id: user.id }))
       const { error } = await supabase.from('emotions').upsert(toInsert as Emotion[], { onConflict: 'user_id,feeling,event_id' })
       if (error) console.error('[upsertEntities] emotions error:', error)
-      else console.log('[upsertEntities] emotions upserted:', toInsert.length)
     }
 
     await get().loadAll()
@@ -267,10 +315,16 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
     if (results.length > 0) {
       const { lat, lon } = results[0]
       const coordinates = { lat: parseFloat(lat), lng: parseFloat(lon) }
-      await supabase
-        .from('locations')
-        .update({ coordinates, coordinates_confirmed: false })
-        .eq('id', locationId)
+
+      if (isLocalMode()) {
+        localDb.update<Location>('locations', locationId, { coordinates, coordinates_confirmed: false } as Partial<Location>)
+      } else {
+        await supabase
+          .from('locations')
+          .update({ coordinates, coordinates_confirmed: false })
+          .eq('id', locationId)
+      }
+
       set(state => ({
         locations: state.locations.map(l =>
           l.id === locationId ? { ...l, coordinates, coordinates_confirmed: false } : l
@@ -282,10 +336,14 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   confirmLocation: async (locationId) => {
-    await supabase
-      .from('locations')
-      .update({ coordinates_confirmed: true })
-      .eq('id', locationId)
+    if (isLocalMode()) {
+      localDb.update<Location>('locations', locationId, { coordinates_confirmed: true } as Partial<Location>)
+    } else {
+      await supabase
+        .from('locations')
+        .update({ coordinates_confirmed: true })
+        .eq('id', locationId)
+    }
     set(state => ({
       locations: state.locations.map(l =>
         l.id === locationId ? { ...l, coordinates_confirmed: true } : l
@@ -294,10 +352,14 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   updateLocationCoordinates: async (locationId, coordinates) => {
-    await supabase
-      .from('locations')
-      .update({ coordinates, coordinates_confirmed: false })
-      .eq('id', locationId)
+    if (isLocalMode()) {
+      localDb.update<Location>('locations', locationId, { coordinates, coordinates_confirmed: false } as Partial<Location>)
+    } else {
+      await supabase
+        .from('locations')
+        .update({ coordinates, coordinates_confirmed: false })
+        .eq('id', locationId)
+    }
     set(state => ({
       locations: state.locations.map(l =>
         l.id === locationId ? { ...l, coordinates, coordinates_confirmed: false } : l
@@ -306,6 +368,18 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   updateOpenQuestions: async (questions) => {
+    if (isLocalMode()) {
+      for (const q of questions) {
+        if (q.id) {
+          localDb.update<OpenQuestion>('open_questions', q.id, q as Partial<OpenQuestion>)
+        } else {
+          localDb.upsert('open_questions', { ...q, id: localDb.genId(), user_id: 'local', status: 'open' })
+        }
+      }
+      set({ openQuestions: localDb.getAll<OpenQuestion>('open_questions').filter(q => q.status === 'open') })
+      return
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     for (const q of questions) {
@@ -325,8 +399,25 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   batchAddFamilyRelationships: async (entries) => {
+    if (entries.length === 0) return
+
+    if (isLocalMode()) {
+      const newRels: FamilyRelationship[] = entries.map(e => ({
+        id: localDb.genId(),
+        user_id: 'local',
+        from_person_id: e.fromPersonId,
+        to_person_id: e.toPersonId,
+        relationship_type: e.type,
+      } as unknown as FamilyRelationship))
+      for (const r of newRels) {
+        localDb.upsert('family_relationships', r)
+      }
+      set(state => ({ familyRelationships: [...state.familyRelationships, ...newRels] }))
+      return
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user || entries.length === 0) return
+    if (!user) return
     const rows = entries.map(e => ({
       user_id: user.id,
       from_person_id: e.fromPersonId,
@@ -341,6 +432,19 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   addFamilyRelationship: async (fromPersonId, toPersonId, type) => {
+    if (isLocalMode()) {
+      const rel = {
+        id: localDb.genId(),
+        user_id: 'local',
+        from_person_id: fromPersonId,
+        to_person_id: toPersonId,
+        relationship_type: type,
+      } as unknown as FamilyRelationship
+      localDb.upsert('family_relationships', rel)
+      set(state => ({ familyRelationships: [...state.familyRelationships, rel] }))
+      return
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const { data, error } = await supabase
@@ -360,13 +464,21 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   deleteLocation: async (id) => {
-    // Clear location_id from any events referencing this location
     const eventsToFix = get().events.filter(e => e.location_id === id)
-    for (const ev of eventsToFix) {
-      await supabase.from('events').update({ location_id: null }).eq('id', ev.id)
+
+    if (isLocalMode()) {
+      for (const ev of eventsToFix) {
+        localDb.update<LifeEvent>('events', ev.id, { location_id: null } as Partial<LifeEvent>)
+      }
+      localDb.remove('locations', id)
+    } else {
+      for (const ev of eventsToFix) {
+        await supabase.from('events').update({ location_id: null }).eq('id', ev.id)
+      }
+      const { error } = await supabase.from('locations').delete().eq('id', id)
+      if (error) { console.error('[deleteLocation] error:', error); throw error }
     }
-    const { error } = await supabase.from('locations').delete().eq('id', id)
-    if (error) { console.error('[deleteLocation] error:', error); throw error }
+
     set(state => ({
       locations: state.locations.filter(l => l.id !== id),
       events: state.events.map(e => e.location_id === id ? { ...e, location_id: null } : e),
@@ -374,18 +486,26 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   updateEvent: async (id, updates) => {
-    const { error } = await supabase.from('events').update(updates).eq('id', id)
-    if (error) { console.error('[updateEvent] error:', error); throw error }
+    if (isLocalMode()) {
+      localDb.update<LifeEvent>('events', id, updates as Partial<LifeEvent>)
+    } else {
+      const { error } = await supabase.from('events').update(updates).eq('id', id)
+      if (error) { console.error('[updateEvent] error:', error); throw error }
+    }
     set(state => ({
       events: state.events.map(e => e.id === id ? { ...e, ...updates } : e),
     }))
   },
 
   deleteEvent: async (id) => {
-    // Delete associated emotions
-    await supabase.from('emotions').delete().eq('event_id', id)
-    const { error } = await supabase.from('events').delete().eq('id', id)
-    if (error) { console.error('[deleteEvent] error:', error); throw error }
+    if (isLocalMode()) {
+      localDb.removeWhere('emotions', i => i.event_id === id)
+      localDb.remove('events', id)
+    } else {
+      await supabase.from('emotions').delete().eq('event_id', id)
+      const { error } = await supabase.from('events').delete().eq('id', id)
+      if (error) { console.error('[deleteEvent] error:', error); throw error }
+    }
     set(state => ({
       events: state.events.filter(e => e.id !== id),
       emotions: state.emotions.filter(em => em.event_id !== id),
@@ -393,6 +513,17 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   addPerson: async (person) => {
+    if (isLocalMode()) {
+      const newPerson = localDb.upsert('persons', {
+        ...person,
+        id: localDb.genId(),
+        user_id: 'local',
+        created_at: localDb.now(),
+      })
+      set(state => ({ persons: [...state.persons, newPerson as Person] }))
+      return
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const { data, error } = await supabase
@@ -407,29 +538,39 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   updatePerson: async (id, updates) => {
-    const { error } = await supabase
-      .from('persons')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-    if (error) { console.error('[updatePerson] error:', error); throw error }
+    if (isLocalMode()) {
+      localDb.update<Person>('persons', id, { ...updates, updated_at: localDb.now() } as Partial<Person>)
+    } else {
+      const { error } = await supabase
+        .from('persons')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) { console.error('[updatePerson] error:', error); throw error }
+    }
     set(state => ({
       persons: state.persons.map(p => p.id === id ? { ...p, ...updates } : p),
     }))
   },
 
   deletePerson: async (id) => {
-    // 1. Delete the person (family_relationships cascade automatically via FK)
-    const { error } = await supabase.from('persons').delete().eq('id', id)
-    if (error) { console.error('[deletePerson] error:', error); throw error }
-
-    // 2. Clean up person_ids arrays in events (not FK-constrained)
-    const eventsToFix = get().events.filter(e => e.person_ids?.includes(id))
-    for (const ev of eventsToFix) {
-      const newIds = ev.person_ids.filter(pid => pid !== id)
-      await supabase.from('events').update({ person_ids: newIds }).eq('id', ev.id)
+    if (isLocalMode()) {
+      localDb.remove('persons', id)
+      localDb.removeWhere('family_relationships', r => r.from_person_id === id || r.to_person_id === id)
+      const eventsToFix = get().events.filter(e => e.person_ids?.includes(id))
+      for (const ev of eventsToFix) {
+        const newIds = ev.person_ids.filter(pid => pid !== id)
+        localDb.update<LifeEvent>('events', ev.id, { person_ids: newIds } as Partial<LifeEvent>)
+      }
+    } else {
+      const { error } = await supabase.from('persons').delete().eq('id', id)
+      if (error) { console.error('[deletePerson] error:', error); throw error }
+      const eventsToFix = get().events.filter(e => e.person_ids?.includes(id))
+      for (const ev of eventsToFix) {
+        const newIds = ev.person_ids.filter(pid => pid !== id)
+        await supabase.from('events').update({ person_ids: newIds }).eq('id', ev.id)
+      }
     }
 
-    // 3. Update local state
     set(state => ({
       persons: state.persons.filter(p => p.id !== id),
       familyRelationships: state.familyRelationships.filter(
@@ -444,7 +585,11 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   removeFamilyRelationship: async (id) => {
-    await supabase.from('family_relationships').delete().eq('id', id)
+    if (isLocalMode()) {
+      localDb.remove('family_relationships', id)
+    } else {
+      await supabase.from('family_relationships').delete().eq('id', id)
+    }
     set(state => ({ familyRelationships: state.familyRelationships.filter(r => r.id !== id) }))
   },
 }))
