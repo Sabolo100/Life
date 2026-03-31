@@ -262,11 +262,13 @@ function formatEventTime(event: LifeEvent): string {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const TRACK_HEIGHT = 48
+const TRACK_HEIGHT = 56
 const TRACK_GAP = 2
 const RULER_HEIGHT = 32
-const LABEL_WIDTH = 120
-const MIN_BLOCK_WIDTH = 8
+const LABEL_WIDTH = 130
+const MIN_BLOCK_WIDTH = 4
+// Minimum display width for point events so the title always fits
+const MIN_POINT_DISPLAY_WIDTH = 76
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -347,9 +349,8 @@ export function TimelineView({ onBack }: TimelineViewProps) {
     }
 
     // ALWAYS show ALL base tracks (even empty ones — visual cue that info is needed)
+    // "other" is already the last entry in TRACKS — don't push OTHER_TRACK again (would duplicate)
     const active = [...TRACKS]
-    // Only add "Egyéb" if there are events that didn't match any track
-    if (trackIds.has('other')) active.push(OTHER_TRACK)
 
     return { placedEvents: placed, activeTracks: active }
   }, [events, birthYear])
@@ -568,9 +569,14 @@ export function TimelineView({ onBack }: TimelineViewProps) {
             const lanes: PlacedEvent[][] = []
             for (const pe of trackEvents.sort((a, b) => a.startYear - b.startYear)) {
               let placed = false
+              // Point events get a wider pill display — use display-pixel gap to avoid overlap
+              const pointGapYears = pe.isRange
+                ? 0
+                : Math.max(1, Math.ceil(MIN_POINT_DISPLAY_WIDTH / YEAR_WIDTH) + 1)
               for (const lane of lanes) {
                 const last = lane[lane.length - 1]
-                if (pe.startYear > last.endYear + (pe.isRange ? 0 : Math.max(1, Math.round(2 / zoom)))) {
+                const gapNeeded = last.isRange ? 0 : pointGapYears
+                if (pe.startYear > last.endYear + gapNeeded) {
                   lane.push(pe)
                   placed = true
                   break
@@ -613,14 +619,33 @@ export function TimelineView({ onBack }: TimelineViewProps) {
                 <line x1={0} y1={trackY + trackH} x2={svgWidth} y2={trackY + trackH}
                   stroke="#e2e8f0" strokeWidth={0.5} />
 
-                {/* Event blocks/dots */}
+                {/* Empty track placeholder */}
+                {trackEvents.length === 0 && (
+                  <text
+                    x={LABEL_WIDTH + (svgWidth - LABEL_WIDTH) / 2}
+                    y={trackY + trackH / 2 + 4}
+                    textAnchor="middle"
+                    fontSize={10}
+                    fill="#d1d5db"
+                    fontStyle="italic"
+                  >
+                    Még nincs rögzített esemény
+                  </text>
+                )}
+
+                {/* Event blocks */}
                 {lanes.map((lane, laneIdx) =>
                   lane.map(pe => {
                     const x1 = yearToX(pe.startYear)
                     const x2 = pe.isRange
                       ? yearToX(pe.endYear + 1)
                       : x1 + Math.max(MIN_BLOCK_WIDTH, YEAR_WIDTH * 0.3)
+                    // Collision-detection width (proportional to duration)
                     const blockW = Math.max(MIN_BLOCK_WIDTH, x2 - x1)
+                    // Display width: point events get a wider pill so the title always fits
+                    const displayW = pe.isRange
+                      ? blockW
+                      : Math.max(MIN_POINT_DISPLAY_WIDTH, blockW)
                     const blockY = trackY + laneIdx * subTrackH + 2
                     const blockH = subTrackH - 4
                     const isSelected = selectedEvent?.id === pe.event.id
@@ -646,35 +671,47 @@ export function TimelineView({ onBack }: TimelineViewProps) {
                           setPopupPos(null)
                         }}
                       >
-                        <rect x={x1} y={blockY} width={blockW} height={blockH}
+                        {/* Anchor tick for point events so the exact position is visible */}
+                        {!pe.isRange && displayW > blockW && (
+                          <rect
+                            x={x1} y={blockY + Math.round(blockH * 0.3)}
+                            width={3} height={Math.round(blockH * 0.4)}
+                            rx={1} fill={track.borderFill} opacity={0.6}
+                          />
+                        )}
+
+                        <rect x={!pe.isRange && displayW > blockW ? x1 + 5 : x1}
+                          y={blockY} width={!pe.isRange && displayW > blockW ? displayW - 5 : displayW}
+                          height={blockH}
                           rx={4} fill={track.fill}
-                          opacity={isSelected ? 1 : 0.75}
-                          stroke={isSelected ? track.borderFill : 'transparent'}
-                          strokeWidth={isSelected ? 2 : 0} />
+                          opacity={isSelected ? 1 : 0.8}
+                          stroke={isSelected ? track.borderFill : 'rgba(255,255,255,0.25)'}
+                          strokeWidth={isSelected ? 2 : 1} />
 
                         {isTurning && (
-                          <text x={x1 + 3} y={blockY + blockH / 2 + 3.5}
+                          <text x={(!pe.isRange && displayW > blockW ? x1 + 5 : x1) + 4}
+                            y={blockY + blockH / 2 + 3.5}
                             fontSize={10} fill="white">★</text>
                         )}
 
-                        {blockW > 40 && (
-                          <foreignObject
-                            x={x1 + (isTurning ? 14 : 4)} y={blockY + 1}
-                            width={blockW - (isTurning ? 18 : 8)} height={blockH - 2}>
-                            <div style={{
-                              fontSize: '9px', color: 'white', fontWeight: 500,
-                              lineHeight: 1.2, overflow: 'hidden',
-                              textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                              paddingTop: blockH > 20 ? '2px' : '0px',
-                            }}>
-                              {pe.event.title}
-                            </div>
-                          </foreignObject>
-                        )}
+                        {/* Title — always visible inside the block */}
+                        <foreignObject
+                          x={(!pe.isRange && displayW > blockW ? x1 + 5 : x1) + (isTurning ? 15 : 5)}
+                          y={blockY + 2}
+                          width={((!pe.isRange && displayW > blockW ? displayW - 5 : displayW) - (isTurning ? 20 : 10))}
+                          height={blockH - 4}>
+                          <div style={{
+                            fontSize: '9px', color: 'white', fontWeight: 600,
+                            lineHeight: 1.25, overflow: 'hidden',
+                            textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            paddingTop: blockH > 22 ? '3px' : '1px',
+                          }}>
+                            {pe.event.title}
+                          </div>
+                        </foreignObject>
 
-                        {blockW <= 40 && (
-                          <title>{pe.event.title} ({formatEventTime(pe.event)})</title>
-                        )}
+                        {/* Browser tooltip for accessibility */}
+                        <title>{pe.event.title} ({formatEventTime(pe.event)})</title>
                       </g>
                     )
                   })
