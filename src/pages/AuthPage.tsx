@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { MosaicBackground } from '@/components/MosaicBackground'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -48,8 +49,9 @@ export function AuthPage({ inviteToken, defaultTab = 'login', onBack }: AuthPage
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-stone-100 p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-[#f8f4ee] p-4 relative">
+      <MosaicBackground opacity={0.35} />
+      <Card className="w-full max-w-md relative z-10 bg-[#faf7f2]/90 backdrop-blur-md shadow-xl shadow-amber-900/10 border-amber-200/50">
         <CardHeader className="text-center relative">
           {onBack && (
             <button

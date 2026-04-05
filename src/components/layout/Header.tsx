@@ -36,7 +36,7 @@ export function Header({
   }
 
   return (
-    <header className="h-14 border-b flex items-center justify-between px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+    <header className="h-14 border-b border-amber-200/50 flex items-center justify-between px-4 bg-[#f8f4ee]/90 backdrop-blur sticky top-0 z-50">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={onToggleSidebar} className="md:hidden">
           <Menu className="w-5 h-5" />
@@ -55,7 +55,7 @@ export function Header({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 text-xs gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50"
+                    className="h-7 text-xs gap-1.5 border-amber-200 text-amber-800 hover:bg-amber-50"
                     onClick={() => onShowShared(share)}
                   >
                     <Eye className="w-3 h-3" />

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { MosaicBackground } from '@/components/MosaicBackground'
 import { Header } from '@/components/layout/Header'
 import { ChatView } from '@/components/chat/ChatView'
 import { SessionSidebar } from '@/components/chat/SessionSidebar'
@@ -79,7 +80,8 @@ export function MainPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-screen flex flex-col relative">
+      <MosaicBackground opacity={0.3} />
       <Header
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         onShowLifeStory={() => toggleView('lifeStory')}
@@ -96,7 +98,7 @@ export function MainPage() {
       />
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
-        <div className="hidden md:flex md:flex-col w-64 border-r bg-muted/30">
+        <div className="hidden md:flex md:flex-col w-64 border-r bg-[#f8f4ee]/80 backdrop-blur-sm relative z-10">
           <SessionSidebar onSessionSelect={() => setCurrentView('chat')} />
           {/* Shared with me section */}
           {incomingShares.length > 0 && (
@@ -123,7 +125,7 @@ export function MainPage() {
           </SheetContent>
         </Sheet>
         {/* Main content */}
-        <main className="flex-1 overflow-hidden relative">
+        <main className="flex-1 overflow-hidden relative z-10 bg-[#f8f4ee]/60">
           {currentView === 'chat' && (
             <ChatView
               onShowLifeStory={() => setCurrentView('lifeStory')}

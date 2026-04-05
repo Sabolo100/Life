@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { MosaicBackground } from '@/components/MosaicBackground'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth-store'
@@ -60,8 +61,9 @@ export function OnboardingPage() {
 
   if (isStorageStep) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <Card className="w-full max-w-lg">
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f4ee] relative p-4">
+        <MosaicBackground opacity={0.35} />
+        <Card className="w-full max-w-lg relative z-10 bg-[#faf7f2]/90 backdrop-blur-md shadow-xl shadow-amber-900/10 border-amber-200/50">
           <CardHeader className="text-center">
             <CardTitle className="text-xl">Hol tároljuk az adataidat?</CardTitle>
             <CardDescription>Ezt később bármikor megváltoztathatod a beállításokban.</CardDescription>
@@ -111,8 +113,9 @@ export function OnboardingPage() {
   const currentStep = steps[step]
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-lg">
+    <div className="min-h-screen flex items-center justify-center bg-[#f8f4ee] relative p-4">
+      <MosaicBackground opacity={0.35} />
+      <Card className="w-full max-w-lg relative z-10 bg-[#faf7f2]/90 backdrop-blur-md shadow-xl shadow-amber-900/10 border-amber-200/50">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center">

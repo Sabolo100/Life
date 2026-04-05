@@ -87,38 +87,39 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /* ── Emlékkönyv warm amber/stone palette ── */
+  --background: oklch(0.976 0.012 76);        /* #f8f4ee warm cream */
+  --foreground: oklch(0.24 0.012 65);          /* warm dark stone */
+  --card: oklch(0.994 0.008 76);              /* slightly warm white */
+  --card-foreground: oklch(0.24 0.012 65);
+  --popover: oklch(0.994 0.008 76);
+  --popover-foreground: oklch(0.24 0.012 65);
+  --primary: oklch(0.382 0.118 49);            /* amber-800 #92400e */
+  --primary-foreground: oklch(0.985 0.008 80); /* cream white */
+  --secondary: oklch(0.955 0.016 76);          /* warm stone-100 */
+  --secondary-foreground: oklch(0.382 0.118 49);
+  --muted: oklch(0.955 0.016 76);
+  --muted-foreground: oklch(0.52 0.018 65);
+  --accent: oklch(0.955 0.016 76);
+  --accent-foreground: oklch(0.24 0.012 65);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --border: oklch(0.878 0.018 74);             /* warm stone border */
+  --input: oklch(0.878 0.018 74);
+  --ring: oklch(0.56 0.155 57);               /* amber-600 */
+  --chart-1: oklch(0.56 0.155 57);            /* amber */
+  --chart-2: oklch(0.469 0.14 44);            /* amber-700 */
+  --chart-3: oklch(0.382 0.118 49);           /* amber-800 */
+  --chart-4: oklch(0.62 0.12 30);             /* terracotta */
+  --chart-5: oklch(0.52 0.08 200);            /* slate */
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.97 0.014 76);
+  --sidebar-foreground: oklch(0.24 0.012 65);
+  --sidebar-primary: oklch(0.382 0.118 49);
+  --sidebar-primary-foreground: oklch(0.985 0.008 80);
+  --sidebar-accent: oklch(0.955 0.016 76);
+  --sidebar-accent-foreground: oklch(0.24 0.012 65);
+  --sidebar-border: oklch(0.878 0.018 74);
+  --sidebar-ring: oklch(0.56 0.155 57);
 }
 
 /* ── Landing page animations ────────────────────────────────────────── */
