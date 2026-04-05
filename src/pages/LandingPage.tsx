@@ -238,7 +238,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             <div className="grid lg:grid-cols-5 gap-10 lg:gap-16 items-center">
               {/* Mosaic illustration */}
               <div className="lg:col-span-2 reveal">
-                <img src="/images/mosaic-hero.png" alt="Mozaik darabok összeállnak" className="w-full max-w-xs mx-auto rounded-2xl" />
+                <img src="/images/mosaic-hero.jpg" alt="Mozaik darabok összeállnak" className="w-full max-w-xs mx-auto rounded-2xl" />
               </div>
               {/* Text */}
               <div className="lg:col-span-3">
@@ -306,7 +306,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               </div>
               {/* Storyteller illustration */}
               <div className="order-1 lg:order-2 reveal reveal-delay-2">
-                <img src="/images/storyteller.png" alt="Mesélő ember" className="w-full max-w-md mx-auto rounded-2xl shadow-xl border border-amber-100/50" />
+                <img src="/images/storyteller.jpg" alt="Mesélő ember" className="w-full max-w-md mx-auto rounded-2xl shadow-xl border border-amber-100/50" />
               </div>
             </div>
           </div>
@@ -459,7 +459,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               Az idővonalad kirajzolódik
             </p>
             <div className="reveal">
-              <img src="/images/timeline.png" alt="Idővonal" className="w-full max-w-4xl mx-auto" />
+              <img src="/images/timeline.jpg" alt="Idővonal" className="w-full max-w-4xl mx-auto" />
             </div>
           </div>
         </section>
@@ -499,7 +499,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               {/* Right: Map + People illustrations */}
               <div className="space-y-8">
                 <div className="reveal reveal-delay-2">
-                  <img src="/images/mosaic-tree.png" alt="Életfa mozaik" className="w-full rounded-2xl shadow-lg border border-amber-100/50" />
+                  <img src="/images/mosaic-tree.jpg" alt="Életfa mozaik" className="w-full rounded-2xl shadow-lg border border-amber-100/50" />
                 </div>
               </div>
             </div>
@@ -541,7 +541,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 </div>
               </div>
               <div className="lg:col-span-2 reveal reveal-delay-2">
-                <img src="/images/family.png" alt="Családi emlékek" className="w-full rounded-2xl shadow-lg border border-amber-100/50" />
+                <img src="/images/family.jpg" alt="Családi emlékek" className="w-full rounded-2xl shadow-lg border border-amber-100/50" />
               </div>
             </div>
           </div>
