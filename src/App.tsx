@@ -21,6 +21,13 @@ export default function App() {
     initialize()
   }, [initialize])
 
+  // When user logs out, always return to landing page (not auth form)
+  useEffect(() => {
+    if (initialized && !user) {
+      setShowAuth(false)
+    }
+  }, [user, initialized])
+
   // ── Clean up Supabase auth redirect hash (#access_token=...) ──────
   // After email confirmation, Supabase redirects back with the session
   // token in the URL hash. The Supabase client picks it up automatically,

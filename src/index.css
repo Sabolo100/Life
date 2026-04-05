@@ -121,6 +121,114 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* ── Landing page animations ────────────────────────────────────────── */
+
+.font-serif { font-family: 'Cormorant Garamond', Georgia, serif; }
+.font-body  { font-family: 'DM Sans', system-ui, sans-serif; }
+
+/* Scroll-reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+.reveal-delay-5 { transition-delay: 0.5s; }
+
+/* Hero title letter stagger */
+@keyframes heroLetterIn {
+  0%   { opacity: 0; transform: translateY(30px) rotateX(20deg); }
+  100% { opacity: 1; transform: translateY(0) rotateX(0); }
+}
+.hero-letter {
+  display: inline-block;
+  animation: heroLetterIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Floating decorative pieces */
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-12px) rotate(3deg); }
+}
+@keyframes floatMedium {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-18px) rotate(-4deg); }
+}
+.float-slow   { animation: floatSlow 7s ease-in-out infinite; }
+.float-medium { animation: floatMedium 5s ease-in-out infinite; }
+
+/* Chat typing animation */
+@keyframes typingDot {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30%           { opacity: 1; transform: translateY(-4px); }
+}
+.typing-dot { animation: typingDot 1.4s ease-in-out infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+/* Timeline step connector pulse */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(180, 120, 60, 0.4); }
+  50%      { box-shadow: 0 0 0 12px rgba(180, 120, 60, 0); }
+}
+.pulse-glow { animation: pulseGlow 2.5s ease-in-out infinite; }
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #92400e, #d97706, #b45309);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Card hover lift */
+.card-hover {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card-hover:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 40px -12px rgba(120, 80, 30, 0.15);
+}
+
+/* Mosaic piece scatter animation */
+@keyframes mosaicAssemble {
+  0%   { opacity: 0; transform: translate(var(--mx, 0), var(--my, 0)) rotate(var(--mr, 0deg)) scale(0.7); }
+  100% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+}
+.mosaic-piece {
+  animation: mosaicAssemble 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Scroll indicator bounce */
+@keyframes scrollBounce {
+  0%, 100% { transform: translateY(0); opacity: 0.6; }
+  50%      { transform: translateY(8px); opacity: 1; }
+}
+.scroll-indicator { animation: scrollBounce 2s ease-in-out infinite; }
+
+/* Phone mockup shine */
+@keyframes phoneShineSweep {
+  0%   { left: -60%; }
+  100% { left: 120%; }
+}
+.phone-shine::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -60%;
+  width: 40%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  animation: phoneShineSweep 4s ease-in-out infinite;
+}
+
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
