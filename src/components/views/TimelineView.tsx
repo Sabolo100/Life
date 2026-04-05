@@ -411,7 +411,7 @@ export function TimelineView({ onBack }: TimelineViewProps) {
 
   if (events.length === 0) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full overflow-hidden">
         <div className="border-b px-4 py-3 flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="w-4 h-4" />
@@ -434,22 +434,23 @@ export function TimelineView({ onBack }: TimelineViewProps) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full">
+    // overflow-hidden is CRITICAL on mobile — prevents wide SVG from leaking out
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="border-b px-4 py-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={onBack}>
+      <div className="border-b px-3 py-2 flex items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onBack}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <h2 className="font-semibold text-sm">Idővonal</h2>
-          <Badge variant="secondary" className="text-xs">{events.length}</Badge>
+          <h2 className="font-semibold text-sm truncate">Idővonal</h2>
+          <Badge variant="secondary" className="text-xs shrink-0">{events.length}</Badge>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 shrink-0">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomOut} title="Kicsinyítés">
             <ZoomOut className="w-3.5 h-3.5" />
           </Button>
-          <span className="text-xs text-muted-foreground w-10 text-center">
+          <span className="text-xs text-muted-foreground w-9 text-center tabular-nums">
             {Math.round(zoom * 100)}%
           </span>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomIn} title="Nagyítás">
@@ -461,8 +462,14 @@ export function TimelineView({ onBack }: TimelineViewProps) {
         </div>
       </div>
 
-      {/* Main timeline area */}
-      <div className="flex-1 overflow-auto relative" ref={scrollRef}>
+      {/* Mobile scroll hint */}
+      <div className="sm:hidden text-center text-[10px] text-muted-foreground py-1 bg-muted/30 shrink-0">
+        ← csúsztass vízszintesen →
+      </div>
+
+      {/* Main timeline area — min-w-0 keeps the flex child from expanding beyond parent */}
+      <div className="flex-1 min-w-0 overflow-auto relative overscroll-contain" ref={scrollRef}
+        style={{ WebkitOverflowScrolling: 'touch' }}>
         <svg
           width={Math.max(svgWidth, 400)}
           height={Math.max(svgHeight, 200)}

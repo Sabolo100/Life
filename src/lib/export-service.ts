@@ -15,9 +15,9 @@ export interface ExportData {
 }
 
 function getFileName(displayName?: string) {
-  const name = displayName || 'eletut'
+  const name = displayName || 'emlekkonyv'
   const date = new Date().toISOString().slice(0, 10)
-  return `eletut_${name}_${date}`
+  return `emlekkonyv_${name}_${date}`
 }
 
 function getEventTimeLabel(event: LifeEvent): string {
@@ -118,7 +118,7 @@ export function exportAsPDF(data: ExportData) {
   }
 
   // Title
-  const title = `Eletut - ${data.displayName || 'Eletutam'}`
+  const title = `Emlékkönyv - ${data.displayName || 'Emlékkönyvem'}`
   addTitle(title)
 
   // Life story (from event narrative_text fields)
@@ -219,7 +219,7 @@ export async function exportAsDOCX(data: ExportData) {
   // Title
   children.push(
     new Paragraph({
-      text: `Életút - ${data.displayName || 'Életutam'}`,
+      text: `Emlékkönyv - ${data.displayName || 'Emlékkönyvem'}`,
       heading: HeadingLevel.TITLE,
       spacing: { after: 300 },
     })

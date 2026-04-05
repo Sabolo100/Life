@@ -5,13 +5,15 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuthStore } from '@/stores/auth-store'
-import { BookOpen } from 'lucide-react'
+import { BookOpen, ArrowLeft } from 'lucide-react'
 
 interface AuthPageProps {
   inviteToken?: string | null
+  defaultTab?: 'login' | 'register'
+  onBack?: () => void
 }
 
-export function AuthPage({ inviteToken }: AuthPageProps) {
+export function AuthPage({ inviteToken, defaultTab = 'login', onBack }: AuthPageProps) {
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [regEmail, setRegEmail] = useState('')
@@ -46,15 +48,23 @@ export function AuthPage({ inviteToken }: AuthPageProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-stone-100 p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+        <CardHeader className="text-center relative">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="absolute left-4 top-4 p-1.5 rounded-md hover:bg-muted text-muted-foreground"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center">
-              <BookOpen className="w-8 h-8 text-primary-foreground" />
+            <div className="w-16 h-16 bg-amber-800 rounded-2xl flex items-center justify-center">
+              <BookOpen className="w-8 h-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Életút AI</CardTitle>
+          <CardTitle className="text-2xl">Emlékkönyv</CardTitle>
           <CardDescription>
             {inviteToken
               ? 'Jelentkezz be vagy regisztrálj a meghívó elfogadásához'
@@ -72,7 +82,7 @@ export function AuthPage({ inviteToken }: AuthPageProps) {
               {success}
             </div>
           )}
-          <Tabs defaultValue="login">
+          <Tabs defaultValue={defaultTab}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Bejelentkezés</TabsTrigger>
               <TabsTrigger value="register">Regisztráció</TabsTrigger>

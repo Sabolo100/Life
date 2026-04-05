@@ -147,7 +147,7 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
       <Tabs defaultValue="story" className="flex-1 min-h-0 flex flex-col">
         <div className="border-b px-4 flex-shrink-0">
           <TabsList className="h-10">
-            <TabsTrigger value="story">Életút</TabsTrigger>
+            <TabsTrigger value="story">Emlékkönyv</TabsTrigger>
             <TabsTrigger value="persons">
               <Users className="w-3 h-3 mr-1" /> Személyek ({persons.length})
             </TabsTrigger>

@@ -160,8 +160,8 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
             </div>
             <h2 className="text-xl font-semibold mb-2">Üdvözöllek!</h2>
             <p className="text-muted-foreground max-w-md">
-              Én vagyok az Életút AI asszisztensed. Segítek felépíteni az élettörténetedet.
-              Kérdezek, hallgatok, és közben szépen összeállítom a te egyedi életutadat.
+              Én vagyok az Emlékkönyv asszisztensed. Segítek felépíteni az élettörténetedet.
+              Kérdezek, hallgatok, és közben szépen összeállítom a te egyedi emlékkönyvedet.
               Meséld el, honnan szeretnéd kezdeni!
             </p>
           </div>

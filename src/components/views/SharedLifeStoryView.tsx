@@ -142,7 +142,7 @@ export function SharedLifeStoryView({ share, onBack }: SharedLifeStoryViewProps)
         <BookOpen className="w-5 h-5 text-primary" />
         <div className="flex-1 min-w-0">
           <h2 className="font-semibold text-sm truncate">
-            {share.owner_name || 'Valaki'} életútja
+            {share.owner_name || 'Valaki'} emlékkönyve
           </h2>
           <p className="text-[10px] text-muted-foreground flex items-center gap-1">
             <Eye className="w-3 h-3" />
@@ -166,7 +166,7 @@ export function SharedLifeStoryView({ share, onBack }: SharedLifeStoryViewProps)
           >
             <span className="text-sm font-medium flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-primary" />
-              Életút szöveg
+              Emlékkönyv szöveg
             </span>
             {expandedSections.story ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -177,7 +177,7 @@ export function SharedLifeStoryView({ share, onBack }: SharedLifeStoryViewProps)
                   {lifeStory.content}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground italic">Még nincs életút szöveg.</p>
+                <p className="text-sm text-muted-foreground italic">Még nincs emlékkönyv szöveg.</p>
               )}
             </div>
           )}
@@ -432,7 +432,7 @@ export function SharedLifeStoryView({ share, onBack }: SharedLifeStoryViewProps)
               </Button>
 
               <p className="text-[10px] text-muted-foreground text-center">
-                Az emléked jóváhagyásra kerül a tulajdonosnak, mielőtt megjelenik az életútban.
+                Az emléked jóváhagyásra kerül a tulajdonosnak, mielőtt megjelenik az emlékkönyvben.
               </p>
             </div>
           )}

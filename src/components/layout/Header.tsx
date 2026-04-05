@@ -43,7 +43,7 @@ export function Header({
         </Button>
         <div className="flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-primary" />
-          <span className="font-semibold text-sm">Életút AI</span>
+          <span className="font-semibold text-sm">Emlékkönyv</span>
         </div>
 
         {/* Shared life stories — prominent in header */}
@@ -62,7 +62,7 @@ export function Header({
                     {share.owner_name || 'Valaki'}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>{share.owner_name || 'Valaki'} életútja</TooltipContent>
+                <TooltipContent>{share.owner_name || 'Valaki'} emlékkönyve</TooltipContent>
               </Tooltip>
             ))}
           </div>
@@ -99,7 +99,7 @@ export function Header({
               <FileText className="w-4 h-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Életút</TooltipContent>
+          <TooltipContent>Emlékkönyv</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger>

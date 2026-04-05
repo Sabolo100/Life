@@ -110,7 +110,7 @@ export function MainPage() {
                   onClick={() => handleShowShared(share)}
                   className="w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-muted transition-colors truncate"
                 >
-                  {share.owner_name || 'Valaki'} életútja
+                  {share.owner_name || 'Valaki'} emlékkönyve
                 </button>
               ))}
             </div>

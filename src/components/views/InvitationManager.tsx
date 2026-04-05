@@ -309,12 +309,12 @@ export function InvitationManager({ onBack }: InvitationManagerProps) {
                       {inv.invited_email && (
                         <Button variant="outline" size="sm" className="text-xs h-7 gap-1"
                           onClick={() => {
-                            const subject = encodeURIComponent(`${profile?.display_name || 'Valaki'} meghívott, hogy tekintsd meg az életútját`)
+                            const subject = encodeURIComponent(`${profile?.display_name || 'Valaki'} meghívott, hogy tekintsd meg az emlékkönyvét`)
                             const body = encodeURIComponent(
                               `Szia${inv.invited_name ? ` ${inv.invited_name}` : ''}!\n\n` +
-                              `${profile?.display_name || 'Valaki'} szeretné megosztani veled az életút-történetét.\n\n` +
+                              `${profile?.display_name || 'Valaki'} szeretné megosztani veled az emlékkönyvét.\n\n` +
                               `Kattints ide az elfogadáshoz:\n${appUrl}?invite=${inv.token}\n\n` +
-                              `Üdvözlettel,\nÉletút AI`
+                              `Üdvözlettel,\nEmlékkönyv`
                             )
                             window.open(`mailto:${inv.invited_email}?subject=${subject}&body=${body}`)
                           }}

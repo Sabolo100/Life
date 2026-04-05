@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
 import { useInvitationStore } from '@/stores/invitation-store'
+import { LandingPage } from '@/pages/LandingPage'
 import { AuthPage } from '@/pages/AuthPage'
 import { OnboardingPage } from '@/pages/OnboardingPage'
 import { MainPage } from '@/pages/MainPage'
@@ -12,6 +13,9 @@ export default function App() {
   const [inviteToken, setInviteToken] = useState<string | null>(null)
   const [inviteResult, setInviteResult] = useState<{ success: boolean; error?: string; message?: string } | null>(null)
   const [inviteProcessing, setInviteProcessing] = useState(false)
+  // Show auth form (login/register) instead of landing page
+  const [showAuth, setShowAuth] = useState(false)
+  const [defaultAuthTab, setDefaultAuthTab] = useState<'login' | 'register'>('login')
 
   useEffect(() => {
     initialize()
@@ -57,7 +61,7 @@ export default function App() {
       setInviteProcessing(true)
       const result = await acceptInvitation(inviteToken)
       if (result.success) {
-        setInviteResult({ success: true, message: 'Meghívó elfogadva! Most már hozzáférsz az életúthoz.' })
+        setInviteResult({ success: true, message: 'Meghívó elfogadva! Most már hozzáférsz az emlékkönyvhöz.' })
       } else {
         setInviteResult({ success: false, error: result.error })
       }
@@ -102,8 +106,13 @@ export default function App() {
         </div>
       )}
 
-      {!user ? (
-        <AuthPage inviteToken={inviteToken} />
+      {!user && !showAuth && !inviteToken ? (
+        <LandingPage
+          onLogin={() => { setDefaultAuthTab('login'); setShowAuth(true) }}
+          onRegister={() => { setDefaultAuthTab('register'); setShowAuth(true) }}
+        />
+      ) : !user ? (
+        <AuthPage inviteToken={inviteToken} defaultTab={defaultAuthTab} onBack={() => setShowAuth(false)} />
       ) : profile && !profile.onboarding_completed ? (
         <OnboardingPage />
       ) : (

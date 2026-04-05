@@ -8,8 +8,8 @@ import type { StoragePreference } from '@/types'
 const steps = [
   {
     icon: BookOpen,
-    title: 'Üdvözlünk az Életút AI-ban!',
-    description: 'Ez az alkalmazás segít felépíteni és megőrizni a személyes élettörténetedet. Egy empatikus AI beszélgetőtárs kérdez, hallgat, és közben automatikusan összeállítja az életutadat.',
+    title: 'Üdvözlünk az Emlékkönyvben!',
+    description: 'Ez az alkalmazás segít felépíteni és megőrizni a személyes élettörténetedet. Egy empatikus AI beszélgetőtárs kérdez, hallgat, és közben automatikusan összeállítja az emlékkönyvedet.',
   },
   {
     icon: MessageSquare,

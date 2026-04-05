@@ -196,23 +196,25 @@ export function MapView({ onBack }: MapViewProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="border-b px-4 py-3 flex items-center gap-2 shrink-0">
-        <Button variant="ghost" size="icon" onClick={onBack}>
+      <div className="border-b px-3 py-2.5 flex items-center gap-2 shrink-0 flex-wrap">
+        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onBack}>
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <h2 className="font-semibold">Térkép</h2>
-        {confirmedCount > 0 && (
-          <Badge variant="secondary" className="text-xs gap-1">
-            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-            {confirmedCount} elfogadott
-          </Badge>
-        )}
-        {pendingCount > 0 && (
-          <Badge variant="outline" className="text-xs gap-1 border-orange-400 text-orange-600">
-            <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />
-            {pendingCount} jóváhagyásra vár
-          </Badge>
-        )}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {confirmedCount > 0 && (
+            <Badge variant="secondary" className="text-xs gap-1">
+              <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+              {confirmedCount} elfogadott
+            </Badge>
+          )}
+          {pendingCount > 0 && (
+            <Badge variant="outline" className="text-xs gap-1 border-orange-400 text-orange-600">
+              <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />
+              {pendingCount} vár
+            </Badge>
+          )}
+        </div>
       </div>
 
       {locations.length === 0 ? (
@@ -260,9 +262,9 @@ export function MapView({ onBack }: MapViewProps) {
               </div>
             )}
 
-            {/* Floating location panel */}
+            {/* Floating location panel — full-width on mobile, top-right on desktop */}
             {selectedLocation && (
-              <div className="absolute top-3 right-3 w-72 bg-background border rounded-xl shadow-xl z-[1000] p-4">
+              <div className="absolute inset-x-2 top-2 sm:inset-auto sm:top-3 sm:right-3 sm:w-72 bg-background border rounded-xl shadow-xl z-[1000] p-3 sm:p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -367,13 +369,13 @@ export function MapView({ onBack }: MapViewProps) {
               </div>
             )}
 
-            {/* Legend */}
-            <div className="absolute bottom-3 left-3 bg-background/90 border rounded-lg px-2.5 py-2 z-[999] text-xs space-y-1">
+            {/* Legend — hidden on mobile when panel open to avoid overlap */}
+            <div className={`absolute bottom-3 left-3 bg-background/90 border rounded-lg px-2.5 py-2 z-[999] text-xs space-y-1 ${selectedLocation ? 'hidden sm:block' : ''}`}>
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-blue-500" /> Elfogadott
+                <span className="w-3 h-3 rounded-full bg-blue-500 shrink-0" /> Elfogadott
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-orange-400" /> Jóváhagyásra vár (húzható)
+                <span className="w-3 h-3 rounded-full bg-orange-400 shrink-0" /> Jóváhagyásra vár
               </div>
             </div>
           </div>
