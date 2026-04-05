@@ -18,21 +18,21 @@ interface MosaicBackgroundProps {
 
 // ── Palette defaults ──────────────────────────────────────────────────────────
 const DEFAULT_PALETTE = [
-  '#f5f0e8', // warm cream
-  '#ede6d6', // light sand
-  '#e8dcc8', // soft beige
-  '#ddd5c4', // warm taupe
-  '#d6cfc3', // muted stone
-  '#cec8bb', // pale clay
-  '#c5bfb3', // dusty sand
-  '#e2ddd3', // off-white
-  '#d9d2c7', // light greige
-  '#eae4d9', // antique white
-  '#c8ccd0', // cool blue-grey
-  '#bdc5cc', // muted slate
-  '#d0d4d8', // soft grey-blue
-  '#c4cdd5', // pale steel
-  '#d8d0c4', // warm grey
+  '#e8d8c0', // warm sand
+  '#d4c4a8', // golden beige
+  '#c9b896', // deeper sand
+  '#ddd0b8', // light taupe
+  '#c8bca4', // muted amber
+  '#d6c8ac', // soft wheat
+  '#bfb49a', // dusty gold
+  '#c4b8a0', // warm stone
+  '#d0c0a4', // antique
+  '#c8c0b0', // grey-beige
+  '#b8c0c4', // cool blue-grey
+  '#a8b4bc', // slate blue
+  '#c0c8cc', // soft grey-blue
+  '#b0b8c0', // steel
+  '#c0b4a0', // warm grey
 ]
 
 // Deterministic pseudo-random from seed
@@ -199,9 +199,9 @@ export function MosaicBackground({
             key={i}
             points={poly.points}
             fill={poly.fill}
-            stroke="#d4cfc5"
-            strokeWidth="0.8"
-            strokeOpacity="0.5"
+            stroke="#c4b89c"
+            strokeWidth="1"
+            strokeOpacity="0.6"
           />
         ))}
       </svg>

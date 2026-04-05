@@ -43,49 +43,6 @@ function useScrollReveal() {
 
 // ── Inline SVG illustrations ──────────────────────────────────────────────────
 
-function MosaicAssemblyIllustration() {
-  const pieces = [
-    { d: 'M20,10 L55,5 L65,35 L40,45 L15,38Z', fill: '#d4a853', delay: 0.1, mx: -30, my: 20 },
-    { d: 'M58,5 L95,8 L100,40 L68,38Z', fill: '#c4977a', delay: 0.3, mx: 25, my: -15 },
-    { d: 'M15,40 L42,47 L50,80 L10,75Z', fill: '#b8c4c0', delay: 0.5, mx: -20, my: 30 },
-    { d: 'M44,48 L70,40 L85,70 L55,82Z', fill: '#d9c9a8', delay: 0.2, mx: 35, my: -25 },
-    { d: 'M72,42 L102,42 L108,75 L88,72Z', fill: '#9caaab', delay: 0.4, mx: 20, my: 20 },
-    { d: 'M8,78 L48,84 L45,115 L5,108Z', fill: '#c8b48a', delay: 0.6, mx: -25, my: -20 },
-    { d: 'M52,85 L90,75 L95,108 L50,118Z', fill: '#a8b5a0', delay: 0.35, mx: 30, my: 15 },
-    { d: 'M93,76 L115,70 L120,105 L98,110Z', fill: '#ddd0b8', delay: 0.55, mx: 15, my: -30 },
-  ]
-  return (
-    <svg viewBox="0 0 125 125" className="w-full h-full">
-      {pieces.map((p, i) => (
-        <polygon
-          key={i}
-          points={p.d.replace(/[MLZ]/g, '').replace(/\s+/g, ' ').trim()}
-          fill={p.fill}
-          stroke="#bfb49a"
-          strokeWidth="0.8"
-          className="mosaic-piece"
-          style={{
-            animationDelay: `${p.delay}s`,
-            '--mx': `${p.mx}px`,
-            '--my': `${p.my}px`,
-            '--mr': `${(i % 2 ? 1 : -1) * 15}deg`,
-          } as React.CSSProperties}
-          opacity={0.9}
-        />
-      ))}
-      {/* Missing piece — subtle dashed outline */}
-      <polygon
-        points="98,110 120,105 125,125 100,125"
-        fill="none"
-        stroke="#c8b88a"
-        strokeWidth="1"
-        strokeDasharray="3 2"
-        opacity={0.5}
-      />
-    </svg>
-  )
-}
-
 function ChatIllustration() {
   return (
     <div className="relative w-full max-w-[300px] mx-auto">
@@ -152,95 +109,6 @@ function ChatIllustration() {
   )
 }
 
-function MiniTimelineIllustration() {
-  const events = [
-    { year: '1975', label: 'Születés', color: '#3b82f6', icon: Baby },
-    { year: '1993', label: 'Érettségi', color: '#a855f7', icon: GraduationCap },
-    { year: '1998', label: 'Első munka', color: '#22c55e', icon: Briefcase },
-    { year: '2003', label: 'Házasság', color: '#ec4899', icon: Heart },
-    { year: '2005', label: 'Költözés', color: '#14b8a6', icon: Home },
-    { year: '2012', label: 'Párizs', color: '#f59e0b', icon: Plane },
-  ]
-  return (
-    <div className="relative py-4 overflow-hidden">
-      {/* Horizontal line */}
-      <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent" />
-      <div className="flex justify-between items-center gap-2 sm:gap-4 px-2">
-        {events.map((evt, i) => {
-          const Icon = evt.icon
-          return (
-            <div key={i} className="relative flex flex-col items-center reveal" style={{ transitionDelay: `${i * 0.12}s` }}>
-              {/* Event dot */}
-              <div
-                className="w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shadow-lg border-2 border-white card-hover cursor-default"
-                style={{ backgroundColor: evt.color }}
-              >
-                <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-              </div>
-              {/* Label */}
-              <div className="mt-2 text-center">
-                <span className="text-[10px] font-bold text-stone-500 font-body block">{evt.year}</span>
-                <span className="text-[9px] sm:text-[10px] text-stone-600 font-body whitespace-nowrap">{evt.label}</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function MapIllustration() {
-  return (
-    <svg viewBox="0 0 200 130" className="w-full h-auto opacity-80">
-      {/* Stylized map of Hungary */}
-      <path d="M30,50 Q50,20 90,25 Q130,15 160,35 Q180,50 175,70 Q170,90 140,100 Q110,110 80,105 Q50,100 35,85 Q20,70 30,50Z"
-        fill="#e8dcc8" stroke="#c8b88a" strokeWidth="1.5" />
-      {/* Map pins */}
-      {[
-        { x: 60, y: 55, color: '#3b82f6', label: 'Miskolc' },
-        { x: 100, y: 45, color: '#22c55e', label: 'Budapest' },
-        { x: 130, y: 70, color: '#f59e0b', label: 'Szeged' },
-        { x: 75, y: 80, color: '#ec4899', label: 'Pécs' },
-      ].map((pin, i) => (
-        <g key={i} className="float-slow" style={{ animationDelay: `${i * 0.8}s` }}>
-          <circle cx={pin.x} cy={pin.y} r="5" fill={pin.color} stroke="white" strokeWidth="1.5" />
-          <circle cx={pin.x} cy={pin.y} r="2" fill="white" />
-          <text x={pin.x} y={pin.y - 10} textAnchor="middle" fontSize="7" fill="#6b5c3e" fontWeight="600"
-            fontFamily="DM Sans, sans-serif">{pin.label}</text>
-        </g>
-      ))}
-    </svg>
-  )
-}
-
-function PeopleIllustration() {
-  const people = [
-    { x: 50, y: 50, r: 22, color: '#d4a853', label: 'Én' },
-    { x: 110, y: 35, r: 16, color: '#9caaab', label: 'Apa' },
-    { x: 110, y: 75, r: 16, color: '#c4977a', label: 'Anya' },
-    { x: 160, y: 30, r: 13, color: '#a8b5a0', label: 'Testvér' },
-    { x: 160, y: 60, r: 13, color: '#b8c4c0', label: 'Barát' },
-    { x: 160, y: 90, r: 13, color: '#ddd0b8', label: 'Peti' },
-  ]
-  return (
-    <svg viewBox="0 0 200 120" className="w-full h-auto">
-      {/* Connection lines */}
-      <line x1="50" y1="50" x2="110" y2="35" stroke="#d4c8a8" strokeWidth="1.5" />
-      <line x1="50" y1="50" x2="110" y2="75" stroke="#d4c8a8" strokeWidth="1.5" />
-      <line x1="110" y1="35" x2="160" y2="30" stroke="#d4c8a8" strokeWidth="1" />
-      <line x1="50" y1="50" x2="160" y2="60" stroke="#d4c8a8" strokeWidth="1" strokeDasharray="4 2" />
-      <line x1="110" y1="75" x2="160" y2="90" stroke="#d4c8a8" strokeWidth="1" />
-      {people.map((p, i) => (
-        <g key={i} className="float-slow" style={{ animationDelay: `${i * 0.6}s` }}>
-          <circle cx={p.x} cy={p.y} r={p.r} fill={p.color} stroke="white" strokeWidth="2" opacity="0.9" />
-          <text x={p.x} y={p.y + 3} textAnchor="middle" fontSize={p.r > 15 ? 8 : 6.5} fill="white" fontWeight="600"
-            fontFamily="DM Sans, sans-serif">{p.label}</text>
-        </g>
-      ))}
-    </svg>
-  )
-}
 
 // ── Memory category cards ─────────────────────────────────────────────────────
 
@@ -273,6 +141,9 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
 
   return (
     <div className="relative min-h-screen font-body bg-[#f8f4ee]">
+      {/* Full-page mosaic background */}
+      <MosaicBackground opacity={0.45} />
+
       <div className="relative z-10">
         {/* ═══════════════════════════════════════════════════════════════════
             NAVIGATION
@@ -303,12 +174,6 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             1. HERO
         ═══════════════════════════════════════════════════════════════════ */}
         <section className="min-h-[90vh] flex items-center relative overflow-hidden">
-          {/* Mosaic only in hero — subtle */}
-          <MosaicBackground opacity={0.18} />
-          {/* Gradient fade so text is readable */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#f8f4ee]/90 via-[#f8f4ee]/60 to-transparent pointer-events-none" />
-          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#f8f4ee] to-transparent pointer-events-none" />
-
           {/* Floating decorative shapes */}
           <div className="absolute top-20 left-[8%] w-16 h-16 rounded-xl bg-amber-200/30 rotate-12 float-slow hidden lg:block" />
           <div className="absolute top-40 right-[12%] w-12 h-12 rounded-lg bg-stone-300/20 -rotate-6 float-medium hidden lg:block" />
@@ -373,9 +238,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             <div className="grid lg:grid-cols-5 gap-10 lg:gap-16 items-center">
               {/* Mosaic illustration */}
               <div className="lg:col-span-2 reveal">
-                <div className="w-48 h-48 sm:w-64 sm:h-64 mx-auto">
-                  <MosaicAssemblyIllustration />
-                </div>
+                <img src="/images/mosaic-hero.png" alt="Mozaik darabok összeállnak" className="w-full max-w-xs mx-auto rounded-2xl" />
               </div>
               {/* Text */}
               <div className="lg:col-span-3">
@@ -400,7 +263,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         {/* ═══════════════════════════════════════════════════════════════════
             3. BESZÉLGESS (with phone mockup)
         ═══════════════════════════════════════════════════════════════════ */}
-        <section className="py-20 sm:py-28 bg-gradient-to-b from-amber-50/50 to-transparent">
+        <section className="py-20 sm:py-28 bg-gradient-to-b from-amber-50/70 to-[#f8f4ee]/50">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
             <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
               {/* Text */}
@@ -441,9 +304,9 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   </ul>
                 </div>
               </div>
-              {/* Phone mockup */}
+              {/* Storyteller illustration */}
               <div className="order-1 lg:order-2 reveal reveal-delay-2">
-                <ChatIllustration />
+                <img src="/images/storyteller.png" alt="Mesélő ember" className="w-full max-w-md mx-auto rounded-2xl shadow-xl border border-amber-100/50" />
               </div>
             </div>
           </div>
@@ -492,7 +355,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         {/* ═══════════════════════════════════════════════════════════════════
             5. MIÉRT JÓ — value cards
         ═══════════════════════════════════════════════════════════════════ */}
-        <section className="py-20 sm:py-28 bg-gradient-to-b from-stone-100/50 to-transparent">
+        <section className="py-20 sm:py-28 bg-gradient-to-b from-stone-100/70 to-[#f8f4ee]/50">
           <div className="max-w-5xl mx-auto px-4 sm:px-6">
             <h2 className="font-serif font-bold text-3xl sm:text-4xl text-stone-800 text-center mb-4 reveal">
               Nem csak felidézed a múltat —<br className="hidden sm:block" /> hanem meg is <span className="gradient-text">őrzöd</span>
@@ -590,12 +453,14 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         {/* ═══════════════════════════════════════════════════════════════════
             MINI TIMELINE SHOWCASE
         ═══════════════════════════════════════════════════════════════════ */}
-        <section className="py-16 bg-gradient-to-b from-amber-50/40 to-transparent overflow-hidden">
+        <section className="py-16 bg-gradient-to-b from-amber-50/70 to-[#f8f4ee]/50 overflow-hidden">
           <div className="max-w-5xl mx-auto px-4 sm:px-6">
             <p className="text-center text-xs font-semibold text-amber-700/60 uppercase tracking-widest mb-4 font-body reveal">
               Az idővonalad kirajzolódik
             </p>
-            <MiniTimelineIllustration />
+            <div className="reveal">
+              <img src="/images/timeline.png" alt="Idővonal" className="w-full max-w-4xl mx-auto" />
+            </div>
           </div>
         </section>
 
@@ -633,13 +498,8 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               </div>
               {/* Right: Map + People illustrations */}
               <div className="space-y-8">
-                <div className="bg-white/60 backdrop-blur rounded-2xl p-6 border border-stone-100 reveal reveal-delay-2">
-                  <p className="text-xs font-semibold text-amber-700/60 uppercase tracking-wider mb-3 font-body">Térképes nézet</p>
-                  <MapIllustration />
-                </div>
-                <div className="bg-white/60 backdrop-blur rounded-2xl p-6 border border-stone-100 reveal reveal-delay-3">
-                  <p className="text-xs font-semibold text-amber-700/60 uppercase tracking-wider mb-3 font-body">Kapcsolati háló</p>
-                  <PeopleIllustration />
+                <div className="reveal reveal-delay-2">
+                  <img src="/images/mosaic-tree.png" alt="Életfa mozaik" className="w-full rounded-2xl shadow-lg border border-amber-100/50" />
                 </div>
               </div>
             </div>
@@ -649,7 +509,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         {/* ═══════════════════════════════════════════════════════════════════
             8. KÖZÖS MÚLT
         ═══════════════════════════════════════════════════════════════════ */}
-        <section className="py-20 sm:py-28 bg-gradient-to-b from-blue-50/30 to-transparent">
+        <section className="py-20 sm:py-28 bg-gradient-to-b from-blue-50/60 to-[#f8f4ee]/50">
           <div className="max-w-5xl mx-auto px-4 sm:px-6">
             <div className="grid lg:grid-cols-5 gap-10 items-center">
               <div className="lg:col-span-3">
@@ -681,7 +541,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 </div>
               </div>
               <div className="lg:col-span-2 reveal reveal-delay-2">
-                <PeopleIllustration />
+                <img src="/images/family.png" alt="Családi emlékek" className="w-full rounded-2xl shadow-lg border border-amber-100/50" />
               </div>
             </div>
           </div>
@@ -725,7 +585,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         {/* ═══════════════════════════════════════════════════════════════════
             10. KINEK SZÓL
         ═══════════════════════════════════════════════════════════════════ */}
-        <section id="kinek" className="py-20 sm:py-28 bg-gradient-to-b from-amber-50/30 to-transparent">
+        <section id="kinek" className="py-20 sm:py-28 bg-gradient-to-b from-amber-50/60 to-[#f8f4ee]/50">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
             <h2 className="font-serif font-bold text-2xl sm:text-3xl text-stone-800 mb-3 reveal">
               Azoknak, akik érzik, hogy a történeteik<br className="hidden sm:block" />
