@@ -1,11 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { MosaicBackground } from '@/components/MosaicBackground'
 import { Button } from '@/components/ui/button'
 import {
   BookOpen, MessageSquare, MapPin, Clock, Users, Shield,
-  ChevronRight, Mic, PenLine, Search, Heart, ArrowDown,
+  ChevronRight, Mic, PenLine, Heart, ArrowDown,
   GraduationCap, Briefcase, Home, Plane, Baby, Star,
-  Lock, Eye, UserPlus, Share2, Sparkles,
+  Lock, Eye, UserPlus, Sparkles, ChevronLeft,
 } from 'lucide-react'
 
 interface LandingPageProps {
@@ -39,6 +39,77 @@ function useScrollReveal() {
       observer?.disconnect()
     }
   }, [])
+}
+
+// ── Screenshot slider ─────────────────────────────────────────────────────────
+
+function ScreenshotSlider({ images }: { images: string[] }) {
+  const [active, setActive] = useState(0)
+
+  // Auto-advance every 3.5 seconds
+  useEffect(() => {
+    if (images.length <= 1) return
+    const id = setInterval(() => setActive(prev => (prev + 1) % images.length), 3500)
+    return () => clearInterval(id)
+  }, [images.length])
+
+  const prev = () => setActive(a => (a - 1 + images.length) % images.length)
+  const next = () => setActive(a => (a + 1) % images.length)
+
+  return (
+    <div className="relative w-full max-w-3xl mx-auto reveal reveal-delay-2">
+      {/* Track */}
+      <div className="overflow-hidden rounded-2xl shadow-2xl border border-amber-100/60">
+        <div
+          className="flex transition-transform duration-500 ease-in-out"
+          style={{ transform: `translateX(-${active * 100}%)` }}
+        >
+          {images.map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt={`Képernyőkép ${i + 1}`}
+              className="w-full shrink-0 object-cover"
+              draggable={false}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Prev / Next */}
+      {images.length > 1 && (
+        <>
+          <button
+            onClick={prev}
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur shadow-md flex items-center justify-center text-stone-600 hover:bg-white transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button
+            onClick={next}
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur shadow-md flex items-center justify-center text-stone-600 hover:bg-white transition-colors"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </>
+      )}
+
+      {/* Dots */}
+      {images.length > 1 && (
+        <div className="flex justify-center gap-1.5 mt-4">
+          {images.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setActive(i)}
+              className={`w-2 h-2 rounded-full transition-all ${
+                i === active ? 'bg-amber-700 w-5' : 'bg-stone-300 hover:bg-stone-400'
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Inline SVG illustrations ──────────────────────────────────────────────────
@@ -126,12 +197,25 @@ const MEMORY_CATEGORIES = [
 // ── Feature showcase ──────────────────────────────────────────────────────────
 
 const FEATURES = [
-  { icon: BookOpen, label: 'Életút szöveg', desc: 'Rendezett, olvasható személyes történet' },
+  { icon: BookOpen, label: 'Életrajz', desc: 'Rendezett, olvasható személyes történet' },
   { icon: Clock, label: 'Idővonal', desc: 'Események vizuális időrendje' },
-  { icon: MapPin, label: 'Térképes nézet', desc: 'Helyszínek a világtérképen' },
-  { icon: Users, label: 'Kapcsolati háló', desc: 'Fontos emberek és családfa' },
-  { icon: PenLine, label: 'Javítható', desc: 'Bármikor bővítheted, pontosíthatod' },
-  { icon: Share2, label: 'Megosztás', desc: 'Vonj be másokat a közös múltba' },
+  { icon: MapPin, label: 'Térkép', desc: 'Helyszínek a világtérképen' },
+  { icon: Users, label: 'Kapcsolatok', desc: 'Fontos emberek és kapcsolati háló' },
+]
+
+// ── Screenshot slider képek ───────────────────────────────────────────────────
+// Ide kerülnek majd a screenshots/ mappából feltöltött képek
+const SCREENSHOTS: string[] = [
+  '/screenshots/Screenshot 2026-04-06 at 6.16.23.png',
+  '/screenshots/Screenshot 2026-04-06 at 6.16.44.png',
+  '/screenshots/Screenshot 2026-04-06 at 6.17.24.png',
+  '/screenshots/Screenshot 2026-04-06 at 6.17.37.png',
+  '/screenshots/Screenshot 2026-04-06 at 6.17.52.png',
+  '/screenshots/Screenshot 2026-04-06 at 6.18.24.png',
+  '/screenshots/Screenshot 2026-04-06 at 6.18.34.png',
+  '/screenshots/Screenshot 2026-04-06 at 6.18.51.png',
+  '/screenshots/Screenshot 2026-04-06 at 6.19.11.png',
+  '/screenshots/Screenshot 2026-04-06 at 6.19.33.png',
 ]
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -209,7 +293,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     Regisztrálok
                   </Button>
                 </div>
-                <p className="text-sm text-stone-400 italic font-serif reveal reveal-delay-4">
+                <p className="text-base text-stone-500 italic font-serif reveal reveal-delay-4">
                   Fogsz rá emlékezni? Fognak rád emlékezni?
                 </p>
               </div>
@@ -231,37 +315,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         </section>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            2. MOZAIK METAFORA
-        ═══════════════════════════════════════════════════════════════════ */}
-        <section className="py-20 sm:py-28">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div className="grid lg:grid-cols-5 gap-10 lg:gap-16 items-center">
-              {/* Mosaic illustration */}
-              <div className="lg:col-span-2 reveal">
-                <img src="/images/mosaic-hero.jpg" alt="Mozaik darabok összeállnak" className="w-full max-w-xs mx-auto rounded-2xl" />
-              </div>
-              {/* Text */}
-              <div className="lg:col-span-3">
-                <h2 className="font-serif font-bold text-3xl sm:text-4xl text-stone-800 mb-5 reveal">
-                  Minden élet apró darabokból áll össze
-                </h2>
-                <p className="text-stone-600 leading-relaxed mb-4 reveal reveal-delay-1">
-                  Vannak emlékek, amelyek élesen élnek bennünk, és vannak olyanok is, amelyek csak
-                  egy helyszín, egy név vagy egy régi történet foszlányaként maradnak meg.
-                  Nem vesznek el teljesen — csak szétszóródnak bennünk az évek során.
-                </p>
-                <p className="text-stone-600 leading-relaxed reveal reveal-delay-2">
-                  Az Emlékkönyv ebben segít. Beszélgetésről beszélgetésre újra előkerülnek ezek a
-                  darabok, és lassan összeállnak egy nagyobb, teljesebb képpé. Mint egy <strong className="text-amber-800">mozaik</strong>,
-                  amelynek minden eleme a saját helyére kerül.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            3. BESZÉLGESS (with phone mockup)
+            2. BESZÉLGESS (with storyteller illustration)
         ═══════════════════════════════════════════════════════════════════ */}
         <section className="py-20 sm:py-28 bg-gradient-to-b from-amber-50/70 to-[#f8f4ee]/50">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -313,83 +367,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         </section>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            4. MILYEN EMLÉKEK — icon grid
-        ═══════════════════════════════════════════════════════════════════ */}
-        <section className="py-20 sm:py-28">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div className="text-center mb-12">
-              <h2 className="font-serif font-bold text-3xl sm:text-4xl text-stone-800 mb-3 reveal">
-                Minden fontos ember, hely és történet
-              </h2>
-              <p className="text-stone-500 max-w-xl mx-auto reveal reveal-delay-1">
-                Az életünk nem csak nagy fordulópontokból áll. Sokszor a kisebb jelenetek
-                maradnak velünk a legtovább.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {MEMORY_CATEGORIES.map((cat, i) => {
-                const Icon = cat.icon
-                return (
-                  <div
-                    key={i}
-                    className="card-hover reveal rounded-2xl p-5 text-center border border-stone-100 cursor-default"
-                    style={{ backgroundColor: cat.bg, transitionDelay: `${i * 0.08}s` }}
-                  >
-                    <div className="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center"
-                      style={{ backgroundColor: `${cat.color}18` }}>
-                      <Icon className="w-6 h-6" style={{ color: cat.color }} />
-                    </div>
-                    <h3 className="font-semibold text-sm text-stone-800 mb-0.5 font-body">{cat.label}</h3>
-                    <p className="text-xs text-stone-500 font-body">{cat.desc}</p>
-                  </div>
-                )
-              })}
-            </div>
-            <p className="text-center text-sm text-stone-400 italic font-serif mt-8 reveal">
-              Az első szerelem, egy emlékezetes szilveszter, egy hosszú nyár —<br className="hidden sm:block" />
-              itt mindennek lehet helye, ami valaha számított.
-            </p>
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            5. MIÉRT JÓ — value cards
-        ═══════════════════════════════════════════════════════════════════ */}
-        <section className="py-20 sm:py-28 bg-gradient-to-b from-stone-100/70 to-[#f8f4ee]/50">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6">
-            <h2 className="font-serif font-bold text-3xl sm:text-4xl text-stone-800 text-center mb-4 reveal">
-              Nem csak felidézed a múltat —<br className="hidden sm:block" /> hanem meg is <span className="gradient-text">őrzöd</span>
-            </h2>
-            <p className="text-stone-500 text-center max-w-xl mx-auto mb-12 reveal reveal-delay-1">
-              Az Emlékkönyv nem hagyja, hogy a történeteid különálló foszlányok maradjanak.
-            </p>
-            <div className="grid sm:grid-cols-3 gap-4">
-              {[
-                { icon: Search, title: 'Egyben látod', desc: 'Segít egyben látni az egész életedet — nem csak töredékekben.' },
-                { icon: MessageSquare, title: 'Előhoz', desc: 'Olyan emlékeket hozhat elő, amikre magadtól nem is gondolnál.' },
-                { icon: Clock, title: 'Rendszerez', desc: 'A szétszórt emlékek időrendbe, kategóriákba rendeződnek.' },
-                { icon: PenLine, title: 'Bővíthető', desc: 'Később is pontosíthatod, javíthatod, kiegészítheted.' },
-                { icon: BookOpen, title: 'Megőriz', desc: 'Megőriz valamit abból, aki voltál — a jövő számára.' },
-                { icon: Lock, title: 'Privát', desc: 'Nem közösségi felület. Személyes emléktér, amelyet te irányítasz.' },
-              ].map((item, i) => {
-                const Icon = item.icon
-                return (
-                  <div key={i} className="card-hover reveal bg-white/80 backdrop-blur rounded-2xl p-6 border border-stone-100"
-                    style={{ transitionDelay: `${i * 0.1}s` }}>
-                    <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center mb-3">
-                      <Icon className="w-5 h-5 text-amber-800" />
-                    </div>
-                    <h3 className="font-semibold text-stone-800 mb-1 font-body">{item.title}</h3>
-                    <p className="text-sm text-stone-500 leading-relaxed font-body">{item.desc}</p>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            6. HOGYAN MŰKÖDIK — vertical timeline steps
+            3. NEM KELL ELŐKÉSZÜLET — lépések
         ═══════════════════════════════════════════════════════════════════ */}
         <section id="hogyan" className="py-20 sm:py-28">
           <div className="max-w-4xl mx-auto px-4 sm:px-6">
@@ -399,11 +377,8 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             <p className="text-stone-500 text-center max-w-md mx-auto mb-14 reveal reveal-delay-1">
               Kis lépésekben, természetes módon halad veled.
             </p>
-
             <div className="relative">
-              {/* Vertical connector line */}
               <div className="absolute left-6 sm:left-8 top-0 bottom-0 w-[2px] bg-gradient-to-b from-amber-300 via-amber-400 to-amber-300 hidden sm:block" />
-
               <div className="space-y-12 sm:space-y-16">
                 {[
                   {
@@ -425,20 +400,13 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   const Icon = step.icon
                   return (
                     <div key={i} className="flex gap-5 sm:gap-8 reveal" style={{ transitionDelay: `${i * 0.15}s` }}>
-                      {/* Step circle */}
                       <div className="relative z-10 shrink-0">
-                        <div
-                          className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shadow-lg pulse-glow"
-                          style={{ backgroundColor: step.accent }}
-                        >
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shadow-lg pulse-glow" style={{ backgroundColor: step.accent }}>
                           <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
                         </div>
                       </div>
-                      {/* Content */}
                       <div className="pt-1 sm:pt-3">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span className="text-xs font-bold text-amber-700/60 font-body">{step.num}. LÉPÉS</span>
-                        </div>
+                        <span className="text-xs font-bold text-amber-700/60 font-body block mb-1.5">{step.num}. LÉPÉS</span>
                         <h3 className="font-serif font-bold text-xl sm:text-2xl text-stone-800 mb-2">{step.title}</h3>
                         <p className="text-stone-600 leading-relaxed max-w-lg font-body">{step.text}</p>
                       </div>
@@ -451,74 +419,95 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         </section>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            MINI TIMELINE SHOWCASE
+            4. MILYEN EMLÉKEK — icon grid
         ═══════════════════════════════════════════════════════════════════ */}
-        <section className="py-16 bg-gradient-to-b from-amber-50/70 to-[#f8f4ee]/50 overflow-hidden">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6">
-            <p className="text-center text-xs font-semibold text-amber-700/60 uppercase tracking-widest mb-4 font-body reveal">
-              Az idővonalad kirajzolódik
-            </p>
-            <div className="reveal">
-              <img src="/images/timeline.jpg" alt="Idővonal" className="w-full max-w-4xl mx-auto" />
+        <section className="py-20 sm:py-28 bg-gradient-to-b from-stone-100/70 to-[#f8f4ee]/50">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-12">
+              <h2 className="font-serif font-bold text-3xl sm:text-4xl text-stone-800 mb-3 reveal">
+                Minden fontos ember, hely és történet
+              </h2>
+              <p className="text-stone-500 max-w-xl mx-auto reveal reveal-delay-1">
+                Az életünk nem csak nagy fordulópontokból áll. Sokszor a kisebb jelenetek
+                maradnak velünk a legtovább.
+              </p>
             </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {MEMORY_CATEGORIES.map((cat, i) => {
+                const Icon = cat.icon
+                return (
+                  <div key={i} className="card-hover reveal rounded-2xl p-5 text-center border border-stone-100 cursor-default"
+                    style={{ backgroundColor: cat.bg, transitionDelay: `${i * 0.08}s` }}>
+                    <div className="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: `${cat.color}18` }}>
+                      <Icon className="w-6 h-6" style={{ color: cat.color }} />
+                    </div>
+                    <h3 className="font-semibold text-sm text-stone-800 mb-0.5 font-body">{cat.label}</h3>
+                    <p className="text-xs text-stone-500 font-body">{cat.desc}</p>
+                  </div>
+                )
+              })}
+            </div>
+            <p className="text-center text-base text-stone-500 italic font-serif mt-8 reveal">
+              Az első szerelem, egy emlékezetes szilveszter, egy hosszú nyár —<br className="hidden sm:block" />
+              itt mindennek lehet helye, ami valaha számított.
+            </p>
           </div>
         </section>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            7. FUNKCIÓK — feature grid with illustrations
+            5. TÖBB NÉZŐPONTBÓL — funkciók + screenshot slider
         ═══════════════════════════════════════════════════════════════════ */}
         <section id="funkciok" className="py-20 sm:py-28">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-start">
-              {/* Left: features grid */}
-              <div>
-                <h2 className="font-serif font-bold text-3xl sm:text-4xl text-stone-800 mb-3 reveal">
-                  Több nézőpontból is visszanézheted
-                </h2>
-                <p className="text-stone-500 mb-8 reveal reveal-delay-1">
-                  Nem csak szöveget gyűjt — többféleképpen rá tudsz nézni a saját múltadra.
-                </p>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {FEATURES.map((feat, i) => {
-                    const Icon = feat.icon
-                    return (
-                      <div key={i} className="card-hover reveal flex items-start gap-3 bg-white/60 backdrop-blur rounded-xl p-4 border border-stone-100"
-                        style={{ transitionDelay: `${i * 0.08}s` }}>
-                        <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
-                          <Icon className="w-4 h-4 text-amber-800" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-sm text-stone-800 font-body">{feat.label}</h4>
-                          <p className="text-xs text-stone-500 font-body">{feat.desc}</p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-              {/* Right: Map + People illustrations */}
-              <div className="space-y-8">
-                <div className="reveal reveal-delay-2">
-                  <img src="/images/mosaic-tree.jpg" alt="Életfa mozaik" className="w-full rounded-2xl shadow-lg border border-amber-100/50" />
-                </div>
-              </div>
+            <h2 className="font-serif font-bold text-3xl sm:text-4xl text-stone-800 mb-3 text-center reveal">
+              Több nézőpontból is visszanézheted
+            </h2>
+            <p className="text-stone-500 mb-12 text-center max-w-xl mx-auto reveal reveal-delay-1">
+              Nem csak szöveget gyűjt — többféleképpen rá tudsz nézni a saját múltadra.
+            </p>
+            {/* 4 feature cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-12">
+              {FEATURES.map((feat, i) => {
+                const Icon = feat.icon
+                return (
+                  <div key={i} className="card-hover reveal flex flex-col items-center gap-3 bg-white/60 backdrop-blur rounded-2xl p-6 border border-stone-100 text-center"
+                    style={{ transitionDelay: `${i * 0.1}s` }}>
+                    <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center">
+                      <Icon className="w-6 h-6 text-amber-800" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-sm text-stone-800 font-body">{feat.label}</h4>
+                      <p className="text-xs text-stone-500 font-body mt-0.5">{feat.desc}</p>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
+            {/* Screenshot slider — megjelenik ha vannak screenshotok */}
+            {SCREENSHOTS.length > 0 ? (
+              <ScreenshotSlider images={SCREENSHOTS} />
+            ) : (
+              /* Placeholder amíg nincsenek screenshotok */
+              <div className="reveal reveal-delay-2">
+                <img src="/images/mosaic-tree.jpg" alt="Életfa mozaik" className="w-full max-w-2xl mx-auto rounded-2xl shadow-lg border border-amber-100/50" />
+              </div>
+            )}
           </div>
         </section>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            8. KÖZÖS MÚLT
+            6. VOND BE — közös múlt
         ═══════════════════════════════════════════════════════════════════ */}
-        <section className="py-20 sm:py-28 bg-gradient-to-b from-blue-50/60 to-[#f8f4ee]/50">
+        <section className="py-20 sm:py-28 bg-gradient-to-b from-amber-50/60 to-[#f8f4ee]/50">
           <div className="max-w-5xl mx-auto px-4 sm:px-6">
             <div className="grid lg:grid-cols-5 gap-10 items-center">
               <div className="lg:col-span-3">
                 <div className="flex items-center gap-3 mb-4 reveal">
-                  <div className="w-11 h-11 rounded-2xl bg-blue-50 flex items-center justify-center">
-                    <UserPlus className="w-5 h-5 text-blue-700" />
+                  <div className="w-11 h-11 rounded-2xl bg-amber-100 flex items-center justify-center">
+                    <UserPlus className="w-5 h-5 text-amber-800" />
                   </div>
                   <h2 className="font-serif font-bold text-3xl sm:text-4xl text-stone-800">
-                    Közös történetek
+                    Vond be családodat, barátaidat
                   </h2>
                 </div>
                 <p className="text-stone-600 leading-relaxed mb-4 reveal reveal-delay-1">
@@ -534,7 +523,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     'gyerekeknek, unokáknak szánt emlékanyag',
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2.5 text-sm text-stone-600">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
                       {item}
                     </div>
                   ))}
@@ -548,13 +537,13 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         </section>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            9. BIZTONSÁG
+            7. BIZTONSÁG
         ═══════════════════════════════════════════════════════════════════ */}
         <section className="py-20 sm:py-24">
           <div className="max-w-4xl mx-auto px-4 sm:px-6">
             <div className="bg-white/70 backdrop-blur rounded-3xl p-8 sm:p-12 border border-stone-100 text-center reveal">
-              <div className="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center mx-auto mb-5">
-                <Shield className="w-8 h-8 text-green-700" />
+              <div className="w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-5">
+                <Shield className="w-8 h-8 text-amber-800" />
               </div>
               <h2 className="font-serif font-bold text-3xl sm:text-4xl text-stone-800 mb-4">
                 A történeted felett te rendelkezel
@@ -571,47 +560,13 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 ].map((item, i) => {
                   const Icon = item.icon
                   return (
-                    <div key={i} className="flex items-center gap-2 bg-green-50/80 rounded-full px-4 py-2 text-sm text-green-800 font-body">
+                    <div key={i} className="flex items-center gap-2 bg-amber-50/80 rounded-full px-4 py-2 text-sm text-amber-900 font-body border border-amber-200/50">
                       <Icon className="w-4 h-4" />
                       {item.text}
                     </div>
                   )
                 })}
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            10. KINEK SZÓL
-        ═══════════════════════════════════════════════════════════════════ */}
-        <section id="kinek" className="py-20 sm:py-28 bg-gradient-to-b from-amber-50/60 to-[#f8f4ee]/50">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-            <h2 className="font-serif font-bold text-2xl sm:text-3xl text-stone-800 mb-3 reveal">
-              Azoknak, akik érzik, hogy a történeteik<br className="hidden sm:block" />
-              többet érdemelnek
-            </h2>
-            <p className="text-stone-500 mb-10 reveal reveal-delay-1">
-              Van egy életszakasz, amikor az ember egyre gyakrabban néz vissza —
-              és kezdi látni, mennyi minden lenne érdemes megőrizni.
-            </p>
-            <div className="grid sm:grid-cols-2 gap-3 max-w-2xl mx-auto text-left">
-              {[
-                'aki szeret visszagondolni a régi időkre',
-                'aki szeretné egyben látni a saját életét',
-                'aki nem író, de szívesen mesélne',
-                'aki megőrizné a családi történeteket',
-                'aki szeretne valamit továbbadni a gyerekeinek',
-                'aki nem akarja, hogy az emlékek csendben elkopjanak',
-              ].map((item, i) => (
-                <div key={i} className="reveal flex items-start gap-3 bg-white/60 backdrop-blur rounded-xl p-4 border border-amber-100/50"
-                  style={{ transitionDelay: `${i * 0.08}s` }}>
-                  <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
-                    <ChevronRight className="w-3.5 h-3.5 text-amber-700" />
-                  </div>
-                  <span className="text-sm text-stone-700 font-body">{item}</span>
-                </div>
-              ))}
             </div>
           </div>
         </section>
@@ -648,7 +603,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     Regisztrálok
                   </Button>
                 </div>
-                <p className="text-sm text-amber-300/70 italic font-serif reveal reveal-delay-4">
+                <p className="text-base text-amber-200 italic font-serif reveal reveal-delay-4">
                   Kezdd el akkor, amikor jólesik. A történeted már ott van benned.
                 </p>
               </div>
