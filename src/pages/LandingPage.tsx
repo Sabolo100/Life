@@ -241,7 +241,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             <div className="hidden sm:flex items-center gap-6 text-sm font-medium text-stone-500 font-body">
               <a href="#hogyan" className="hover:text-amber-800 transition-colors">Hogyan működik</a>
               <a href="#funkciok" className="hover:text-amber-800 transition-colors">Funkciók</a>
-              <a href="#kinek" className="hover:text-amber-800 transition-colors">Kinek szól</a>
+              <a href="#vonj-be" className="hover:text-amber-800 transition-colors">Vond be a családod</a>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" className="text-stone-600 font-body" onClick={onLogin}>
@@ -498,7 +498,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         {/* ═══════════════════════════════════════════════════════════════════
             6. VOND BE — közös múlt
         ═══════════════════════════════════════════════════════════════════ */}
-        <section className="py-20 sm:py-28 bg-gradient-to-b from-amber-50/60 to-[#f8f4ee]/50">
+        <section id="vonj-be" className="py-20 sm:py-28 bg-gradient-to-b from-amber-50/60 to-[#f8f4ee]/50">
           <div className="max-w-5xl mx-auto px-4 sm:px-6">
             <div className="grid lg:grid-cols-5 gap-10 items-center">
               <div className="lg:col-span-3">
