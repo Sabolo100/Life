@@ -98,16 +98,15 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
         .order('created_at', { ascending: false }),
     ])
 
-    // Enrich shares with profile names
+    // Enrich shares with profile names using RPC (bypasses RLS, includes email fallback)
     const shares = (sharesRes.data as LifeStoryShare[]) || []
     if (shares.length > 0) {
       const userIds = shares.map(s => s.shared_with_id)
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, display_name')
-        .in('id', userIds)
-      if (profiles) {
-        const nameMap = new Map(profiles.map(p => [p.id, p.display_name]))
+      const { data: names } = await supabase.rpc('get_profile_display_names', {
+        user_ids: userIds,
+      })
+      if (names && Array.isArray(names)) {
+        const nameMap = new Map(names.map((n: { id: string; display_name: string }) => [n.id, n.display_name]))
         for (const share of shares) {
           share.shared_with_name = nameMap.get(share.shared_with_id) || undefined
         }
@@ -278,21 +277,15 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
 
     const invites = (data as Invitation[]) || []
 
-    // Enrich with owner names
+    // Enrich with owner names using RPC (bypasses RLS, includes email fallback)
     if (invites.length > 0) {
       const ownerIds = invites.map(i => i.user_id)
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, display_name')
-        .in('id', ownerIds)
-      if (profiles) {
-        const nameMap = new Map(profiles.map(p => [p.id, p.display_name]))
+      const { data: names } = await supabase.rpc('get_profile_display_names', {
+        user_ids: ownerIds,
+      })
+      if (names && Array.isArray(names)) {
+        const nameMap = new Map(names.map((n: { id: string; display_name: string }) => [n.id, n.display_name]))
         for (const inv of invites) {
-          // Store owner name in invited_name if not already set
-          if (!inv.invited_name) {
-            inv.invited_name = nameMap.get(inv.user_id) || undefined as unknown as string
-          }
-          // Add owner display name as a custom field
           ;(inv as Invitation & { owner_name?: string }).owner_name = nameMap.get(inv.user_id) || undefined
         }
       }
@@ -314,15 +307,14 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
 
     const shares = (data as LifeStoryShare[]) || []
 
-    // Enrich with owner names
+    // Enrich with owner names using RPC (bypasses RLS, includes email fallback)
     if (shares.length > 0) {
       const ownerIds = shares.map(s => s.owner_id)
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, display_name')
-        .in('id', ownerIds)
-      if (profiles) {
-        const nameMap = new Map(profiles.map(p => [p.id, p.display_name]))
+      const { data: names } = await supabase.rpc('get_profile_display_names', {
+        user_ids: ownerIds,
+      })
+      if (names && Array.isArray(names)) {
+        const nameMap = new Map(names.map((n: { id: string; display_name: string }) => [n.id, n.display_name]))
         for (const share of shares) {
           share.owner_name = nameMap.get(share.owner_id) || undefined
         }
