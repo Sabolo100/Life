@@ -42,9 +42,14 @@ interface InvitationState {
     reviewerNotes?: string
   ) => Promise<void>
 
+  // Received invitations (where I am the invited person)
+  receivedInvitations: Invitation[]
+  loadReceivedInvitations: () => Promise<void>
+
   // Guest actions
   loadIncomingShares: () => Promise<void>
   acceptInvitation: (token: string) => Promise<{ success: boolean; error?: string; share?: LifeStoryShare }>
+  checkEmailInvitations: () => Promise<{ token: string }[]>
   addContribution: (params: {
     ownerId: string
     contributionType: ContributionType
@@ -71,6 +76,7 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   pendingContributions: [],
   allContributions: [],
   incomingShares: [],
+  receivedInvitations: [],
   loading: false,
 
   // ── Owner: Load invitations & shares ──────────────────────────────
@@ -219,15 +225,29 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
     // If approved and it's a memory, create an event from it
     if (decision === 'approved' && contribution.contribution_type === 'memory') {
       const content = contribution.content as Record<string, string>
+
+      // Parse time_info to extract year (e.g. "2005", "2005 nyara", "kb. 2010")
+      let estimatedYear: number | null = content.estimated_year ? parseInt(content.estimated_year) : null
+      let timeType = content.time_type || 'uncertain'
+      const timeInfo = content.time_info || ''
+
+      if (!estimatedYear && timeInfo) {
+        const yearMatch = timeInfo.match(/\b(19|20)\d{2}\b/)
+        if (yearMatch) {
+          estimatedYear = parseInt(yearMatch[0])
+          if (!content.time_type) timeType = 'estimated_year'
+        }
+      }
+
       await supabase.from('events').insert({
         user_id: user.id,
         title: contribution.title || content.description?.slice(0, 60) || 'Megosztott emlék',
         description: content.description || null,
-        time_type: content.time_type || 'uncertain',
+        time_type: timeType,
         exact_date: content.exact_date || null,
-        estimated_year: content.estimated_year ? parseInt(content.estimated_year) : null,
+        estimated_year: estimatedYear,
         life_phase: content.life_phase || null,
-        uncertain_time: content.uncertain_time || null,
+        uncertain_time: timeInfo || content.uncertain_time || null,
         category: content.category || '',
         source: 'invited_person',
         contributor_id: contribution.contributor_id,
@@ -242,6 +262,43 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
 
     // Refresh
     await get().loadContributions()
+  },
+
+  // ── Guest: Load received invitations (where my email was invited) ──
+
+  loadReceivedInvitations: async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.email) return
+
+    const { data } = await supabase
+      .from('invitations')
+      .select('*')
+      .eq('invited_email', user.email)
+      .order('created_at', { ascending: false })
+
+    const invites = (data as Invitation[]) || []
+
+    // Enrich with owner names
+    if (invites.length > 0) {
+      const ownerIds = invites.map(i => i.user_id)
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', ownerIds)
+      if (profiles) {
+        const nameMap = new Map(profiles.map(p => [p.id, p.display_name]))
+        for (const inv of invites) {
+          // Store owner name in invited_name if not already set
+          if (!inv.invited_name) {
+            inv.invited_name = nameMap.get(inv.user_id) || undefined as unknown as string
+          }
+          // Add owner display name as a custom field
+          ;(inv as Invitation & { owner_name?: string }).owner_name = nameMap.get(inv.user_id) || undefined
+        }
+      }
+    }
+
+    set({ receivedInvitations: invites })
   },
 
   // ── Guest: Load incoming shares ───────────────────────────────────
@@ -314,6 +371,32 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
       console.error('[acceptInvitation] error:', err)
       return { success: false, error: 'Hálózati hiba. Kérjük, próbáld újra.' }
     }
+  },
+
+  // ── Guest: Auto-accept all pending invitations matching user email ──
+
+  checkEmailInvitations: async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.email) return []
+
+    // Find pending invitations for this email
+    const { data } = await supabase
+      .from('invitations')
+      .select('token')
+      .eq('invited_email', user.email)
+      .eq('status', 'pending')
+
+    if (!data || data.length === 0) return []
+
+    const accepted: { token: string }[] = []
+    for (const inv of data) {
+      const result = await get().acceptInvitation(inv.token)
+      if (result.success) {
+        accepted.push({ token: inv.token })
+      }
+    }
+
+    return accepted
   },
 
   // ── Guest: Add contribution ───────────────────────────────────────

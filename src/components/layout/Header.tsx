@@ -1,12 +1,14 @@
+import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthStore } from '@/stores/auth-store'
-import { BookOpen, Settings, LogOut, Menu, FileText, Clock, MapPin, Users, UserPlus, Eye } from 'lucide-react'
+import { BookOpen, Settings, LogOut, Menu, FileText, Clock, MapPin, Users, UserPlus, Eye, ChevronDown } from 'lucide-react'
 import type { LifeStoryShare } from '@/types'
 
 interface HeaderProps {
   onToggleSidebar: () => void
+  onGoHome: () => void
   onShowLifeStory: () => void
   onShowTimeline: () => void
   onShowMap: () => void
@@ -17,15 +19,31 @@ interface HeaderProps {
   aiStatus: 'ok' | 'unknown' | 'error'
   storageStatus: 'ok' | 'error'
   pendingContribCount?: number
+  pendingReceivedInvites?: number
   incomingShares?: LifeStoryShare[]
 }
 
 export function Header({
-  onToggleSidebar, onShowLifeStory, onShowTimeline, onShowMap,
+  onToggleSidebar, onGoHome, onShowLifeStory, onShowTimeline, onShowMap,
   onShowRelationships, onShowSettings, onShowInvitations, onShowShared,
-  aiStatus, storageStatus, pendingContribCount = 0, incomingShares = [],
+  aiStatus, storageStatus, pendingContribCount = 0, pendingReceivedInvites = 0,
+  incomingShares = [],
 }: HeaderProps) {
   const { profile, signOut } = useAuthStore()
+  const [sharesOpen, setSharesOpen] = useState(false)
+  const sharesRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!sharesOpen) return
+    const handleClick = (e: MouseEvent) => {
+      if (sharesRef.current && !sharesRef.current.contains(e.target as Node)) {
+        setSharesOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [sharesOpen])
 
   const statusColor = (status: string) => {
     switch (status) {
@@ -35,38 +53,22 @@ export function Header({
     }
   }
 
+  const totalAlerts = pendingContribCount + pendingReceivedInvites
+
   return (
     <header className="h-14 border-b border-amber-200/50 flex items-center justify-between px-4 bg-[#f8f4ee]/90 backdrop-blur sticky top-0 z-50">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={onToggleSidebar} className="md:hidden">
           <Menu className="w-5 h-5" />
         </Button>
-        <div className="flex items-center gap-2">
+        {/* Logo — acts as home button */}
+        <button
+          onClick={onGoHome}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+        >
           <BookOpen className="w-5 h-5 text-primary" />
           <span className="font-semibold text-sm">Emlékkönyv</span>
-        </div>
-
-        {/* Shared life stories — prominent in header */}
-        {incomingShares.length > 0 && (
-          <div className="hidden sm:flex items-center gap-1 ml-3 border-l pl-3">
-            {incomingShares.map(share => (
-              <Tooltip key={share.id}>
-                <TooltipTrigger>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs gap-1.5 border-amber-200 text-amber-800 hover:bg-amber-50"
-                    onClick={() => onShowShared(share)}
-                  >
-                    <Eye className="w-3 h-3" />
-                    {share.owner_name || 'Valaki'}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{share.owner_name || 'Valaki'} emlékkönyve</TooltipContent>
-              </Tooltip>
-            ))}
-          </div>
-        )}
+        </button>
       </div>
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-3 mr-4">
@@ -125,16 +127,63 @@ export function Header({
           </TooltipTrigger>
           <TooltipContent>Kapcsolatok</TooltipContent>
         </Tooltip>
+
+        {/* "Mások élete" — dropdown for shared stories */}
+        {incomingShares.length > 0 && (
+          <div className="relative" ref={sharesRef}>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-xs h-9 px-2.5"
+                  onClick={() => setSharesOpen(!sharesOpen)}
+                >
+                  <Eye className="w-4 h-4" />
+                  <span className="hidden sm:inline">Mások élete</span>
+                  <ChevronDown className="w-3 h-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Megosztott emlékkönyvek</TooltipContent>
+            </Tooltip>
+            {sharesOpen && (
+              <div className="absolute right-0 top-full mt-1 w-60 bg-background border rounded-xl shadow-xl z-50 py-1">
+                <p className="px-3 py-1.5 text-[10px] uppercase text-muted-foreground font-medium">
+                  Megosztva velem
+                </p>
+                {incomingShares.map(share => (
+                  <button
+                    key={share.id}
+                    onClick={() => {
+                      onShowShared(share)
+                      setSharesOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2"
+                  >
+                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary shrink-0">
+                      {(share.owner_name || '?')[0].toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{share.owner_name || 'Valaki'}</p>
+                      <p className="text-[10px] text-muted-foreground">emlékkönyve</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <Tooltip>
           <TooltipTrigger>
             <Button variant="ghost" size="icon" onClick={onShowInvitations} className="relative">
               <UserPlus className="w-4 h-4" />
-              {pendingContribCount > 0 && (
+              {totalAlerts > 0 && (
                 <Badge
                   variant="destructive"
                   className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] flex items-center justify-center"
                 >
-                  {pendingContribCount}
+                  {totalAlerts}
                 </Badge>
               )}
             </Button>

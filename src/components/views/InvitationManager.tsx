@@ -7,10 +7,10 @@ import { Badge } from '@/components/ui/badge'
 import {
   ArrowLeft, UserPlus, Copy, Check, X, Trash2, Clock, Eye,
   MessageSquare, PenLine, Edit3,
-  Link2, Mail, Shield, Users, Bell, CheckCircle2, XCircle, AlertCircle,
+  Link2, Mail, Shield, Users, Bell, CheckCircle2, XCircle, AlertCircle, Inbox,
 } from 'lucide-react'
 import type {
-  PermissionLevel, Contribution,
+  PermissionLevel, Contribution, Invitation,
 } from '@/types'
 import { PERMISSION_LABELS, PERSPECTIVE_LABELS } from '@/types'
 
@@ -64,14 +64,16 @@ interface InvitationManagerProps {
 export function InvitationManager({ onBack }: InvitationManagerProps) {
   const {
     invitations, outgoingShares, pendingContributions, allContributions,
+    receivedInvitations,
     loadInvitations, createInvitation, revokeInvitation, revokeShare,
     updateSharePermission, loadContributions, reviewContribution,
+    loadReceivedInvitations, acceptInvitation,
   } = useInvitationStore()
 
   const { events, persons } = useLifeStoryStore()
   const { profile } = useAuthStore()
 
-  const [tab, setTab] = useState<'invite' | 'shares' | 'contributions'>('invite')
+  const [tab, setTab] = useState<'invite' | 'shares' | 'contributions' | 'received'>('invite')
   const [creating, setCreating] = useState(false)
   const [invitedName, setInvitedName] = useState('')
   const [invitedEmail, setInvitedEmail] = useState('')
@@ -81,10 +83,22 @@ export function InvitationManager({ onBack }: InvitationManagerProps) {
   const [reviewingId, setReviewingId] = useState<string | null>(null)
   const [reviewNotes, setReviewNotes] = useState('')
 
+  const [acceptingToken, setAcceptingToken] = useState<string | null>(null)
+
   useEffect(() => {
     loadInvitations()
     loadContributions()
-  }, [loadInvitations, loadContributions])
+    loadReceivedInvitations()
+  }, [loadInvitations, loadContributions, loadReceivedInvitations])
+
+  const pendingReceivedCount = receivedInvitations.filter(i => i.status === 'pending').length
+
+  const handleAcceptReceived = async (inv: Invitation) => {
+    setAcceptingToken(inv.token)
+    await acceptInvitation(inv.token)
+    await loadReceivedInvitations()
+    setAcceptingToken(null)
+  }
 
   const appUrl = window.location.origin
 
@@ -189,6 +203,22 @@ export function InvitationManager({ onBack }: InvitationManagerProps) {
           {pendingContributions.length > 0 && (
             <span className="absolute -top-0.5 right-2 w-4 h-4 bg-destructive text-destructive-foreground rounded-full text-[10px] flex items-center justify-center">
               {pendingContributions.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab('received')}
+          className={`flex-1 py-2.5 text-sm font-medium border-b-2 transition-colors relative ${
+            tab === 'received'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Inbox className="w-4 h-4 inline mr-1.5" />
+          Kapott
+          {pendingReceivedCount > 0 && (
+            <span className="absolute -top-0.5 right-2 w-4 h-4 bg-destructive text-destructive-foreground rounded-full text-[10px] flex items-center justify-center">
+              {pendingReceivedCount}
             </span>
           )}
         </button>
@@ -498,6 +528,89 @@ export function InvitationManager({ onBack }: InvitationManagerProps) {
                 <Bell className="w-10 h-10 mx-auto mb-3 opacity-30" />
                 <p className="text-sm">Még nem érkezett hozzájárulás.</p>
                 <p className="text-xs mt-1">Ha meghívottjaid megosztanak emlékeket, itt fognak megjelenni.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── RECEIVED INVITATIONS TAB ─────────────────────────── */}
+        {tab === 'received' && (
+          <div className="space-y-3">
+            {/* Pending received invitations */}
+            {receivedInvitations.filter(i => i.status === 'pending').length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium flex items-center gap-2 text-orange-600">
+                  <AlertCircle className="w-4 h-4" />
+                  Elfogadásra vár
+                </h3>
+                {receivedInvitations
+                  .filter(i => i.status === 'pending')
+                  .map(inv => {
+                    const ownerName = (inv as Invitation & { owner_name?: string }).owner_name || 'Valaki'
+                    return (
+                      <div key={inv.id} className="border border-orange-200 rounded-xl p-4 bg-card space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                            {ownerName[0].toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">{ownerName} meghívott téged</p>
+                            <p className="text-xs text-muted-foreground">
+                              Jogosultság: {PERMISSION_LABELS[inv.permission_level].label}
+                            </p>
+                            {inv.expires_at && (
+                              <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                <Clock className="w-3 h-3" />
+                                Lejár: {new Date(inv.expires_at).toLocaleDateString('hu-HU')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          className="w-full gap-1.5"
+                          disabled={acceptingToken === inv.token}
+                          onClick={() => handleAcceptReceived(inv)}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          {acceptingToken === inv.token ? 'Elfogadás...' : 'Meghívó elfogadása'}
+                        </Button>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+
+            {/* Accepted received invitations */}
+            {receivedInvitations.filter(i => i.status === 'accepted').length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-muted-foreground">Elfogadott meghívók</h3>
+                {receivedInvitations
+                  .filter(i => i.status === 'accepted')
+                  .map(inv => {
+                    const ownerName = (inv as Invitation & { owner_name?: string }).owner_name || 'Valaki'
+                    return (
+                      <div key={inv.id} className="border rounded-lg p-3 bg-muted/30 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-green-500" />
+                          <span className="text-sm">{ownerName} emlékkönyve</span>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {PERMISSION_LABELS[inv.permission_level].label}
+                          </Badge>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">
+                          {inv.accepted_at ? new Date(inv.accepted_at).toLocaleDateString('hu-HU') : ''}
+                        </span>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+
+            {receivedInvitations.length === 0 && (
+              <div className="text-center py-10 text-muted-foreground">
+                <Inbox className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Nem kaptál még meghívót.</p>
+                <p className="text-xs mt-1">Ha valaki megosztja veled az emlékkönyvét, itt fog megjelenni.</p>
               </div>
             )}
           </div>

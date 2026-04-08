@@ -36,12 +36,14 @@ export function MainPage() {
   const { loadSessions, sessions, loading, createSession, currentSession } = useChatStore()
   const { loadAll, openQuestions } = useLifeStoryStore()
   const {
-    loadInvitations, loadIncomingShares, loadContributions,
-    pendingContributions, incomingShares,
+    loadInvitations, loadIncomingShares, loadContributions, loadReceivedInvitations,
+    pendingContributions, incomingShares, receivedInvitations,
   } = useInvitationStore()
 
   const openCount = openQuestions.filter(q => q.status === 'open').length
   const pendingContribCount = pendingContributions.length
+
+  const pendingReceivedInvites = receivedInvitations.filter(i => i.status === 'pending').length
 
   useEffect(() => {
     loadSessions()
@@ -49,7 +51,8 @@ export function MainPage() {
     loadInvitations()
     loadIncomingShares()
     loadContributions()
-  }, [loadSessions, loadAll, loadInvitations, loadIncomingShares, loadContributions])
+    loadReceivedInvitations()
+  }, [loadSessions, loadAll, loadInvitations, loadIncomingShares, loadContributions, loadReceivedInvitations])
 
   useEffect(() => {
     if (loading) return
@@ -84,6 +87,7 @@ export function MainPage() {
       <MosaicBackground opacity={0.3} />
       <Header
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        onGoHome={() => setCurrentView('chat')}
         onShowLifeStory={() => toggleView('lifeStory')}
         onShowTimeline={() => toggleView('timeline')}
         onShowMap={() => toggleView('map')}
@@ -94,29 +98,13 @@ export function MainPage() {
         aiStatus={aiStatus}
         storageStatus={storageStatus}
         pendingContribCount={pendingContribCount}
+        pendingReceivedInvites={pendingReceivedInvites}
         incomingShares={incomingShares}
       />
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
         <div className="hidden md:flex md:flex-col w-64 border-r bg-[#f8f4ee]/80 backdrop-blur-sm relative z-10">
           <SessionSidebar onSessionSelect={() => setCurrentView('chat')} />
-          {/* Shared with me section */}
-          {incomingShares.length > 0 && (
-            <div className="border-t px-3 py-2 shrink-0">
-              <p className="text-[10px] uppercase text-muted-foreground font-medium mb-1.5 px-1">
-                Megosztva velem
-              </p>
-              {incomingShares.map(share => (
-                <button
-                  key={share.id}
-                  onClick={() => handleShowShared(share)}
-                  className="w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-muted transition-colors truncate"
-                >
-                  {share.owner_name || 'Valaki'} emlékkönyve
-                </button>
-              ))}
-            </div>
-          )}
         </div>
         {/* Mobile sidebar */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>

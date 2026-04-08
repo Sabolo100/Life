@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Erősítsd meg az email címedet – Emlékkönyv</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f0e8;font-family:'Georgia',serif;">
+
+  <!-- Outer wrapper -->
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f0e8;padding:40px 16px;">
+    <tr>
+      <td align="center">
+
+        <!-- Card -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#fffdf9;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(92,60,20,0.10);">
+
+          <!-- Header sáv -->
+          <tr>
+            <td style="background-color:#92400e;padding:28px 40px 24px;">
+              <table cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding-right:10px;vertical-align:middle;">
+                    <!-- Könyv ikon SVG -->
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" stroke="#fef3c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" stroke="#fef3c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </td>
+                  <td style="vertical-align:middle;white-space:nowrap;">
+                    <span style="color:#fef3c7;font-size:20px;font-weight:bold;letter-spacing:0;">Emlékkönyv</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:40px 40px 32px;">
+
+              <p style="margin:0 0 8px;font-size:13px;font-weight:bold;letter-spacing:1.2px;color:#b45309;text-transform:uppercase;font-family:Arial,sans-serif;">
+                Regisztráció megerősítése
+              </p>
+
+              <h1 style="margin:0 0 20px;font-size:26px;color:#1c1917;line-height:1.3;font-family:'Georgia',serif;">
+                Köszönjük, hogy csatlakoztál!
+              </h1>
+
+              <p style="margin:0 0 16px;font-size:16px;color:#44403c;line-height:1.7;font-family:Arial,sans-serif;">
+                Örülünk, hogy az <strong style="color:#92400e;">Emlékkönyvet</strong> választottad életed
+                történeteinek megőrzéséhez. Egy lépés van még hátra: erősítsd meg az email
+                címedet az alábbi gombbal.
+              </p>
+
+              <p style="margin:0 0 32px;font-size:16px;color:#44403c;line-height:1.7;font-family:Arial,sans-serif;">
+                A megerősítés után azonnal beléphetsz, és elkezdhetsz mesélni.
+              </p>
+
+              <!-- CTA gomb -->
+              <table cellpadding="0" cellspacing="0" style="margin:0 0 32px;">
+                <tr>
+                  <td style="border-radius:10px;background-color:#92400e;">
+                    <a href="{{ .ConfirmationURL }}"
+                       style="display:inline-block;padding:16px 36px;color:#ffffff !important;font-size:16px;font-weight:bold;text-decoration:none;border-radius:10px;font-family:Arial,sans-serif;letter-spacing:0.2px;">
+                      <span style="color:#ffffff !important;text-decoration:none;">Email cím megerősítése →</span>
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Elválasztó -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                <tr>
+                  <td style="border-top:1px solid #e7e0d4;"></td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 8px;font-size:13px;color:#78716c;line-height:1.6;font-family:Arial,sans-serif;">
+                Ha a gomb nem működik, másold be ezt a linket a böngésződbe:
+              </p>
+              <p style="margin:0 0 24px;font-size:12px;color:#92400e;word-break:break-all;font-family:'Courier New',monospace;">
+                {{ .ConfirmationURL }}
+              </p>
+
+              <p style="margin:0;font-size:13px;color:#a8a29e;line-height:1.6;font-family:Arial,sans-serif;">
+                Ha nem te regisztráltál az Emlékkönyvre, ezt a levelet figyelmen kívül hagyhatod.
+                Fiókod csak akkor jön létre, ha a megerősítő linkre kattintasz.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f5ede0;padding:20px 40px;border-top:1px solid #e7ddd0;">
+              <p style="margin:0;font-size:12px;color:#a8a29e;text-align:center;font-family:Arial,sans-serif;line-height:1.6;">
+                <strong style="color:#92400e;">Emlékkönyv</strong> — www.emlekkonyv.com<br/>
+                Ez egy automatikusan küldött értesítő levél, kérjük ne válaszolj rá.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Card -->
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

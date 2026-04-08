@@ -599,7 +599,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   <Button size="lg" className="bg-white text-amber-900 hover:bg-amber-50 px-8 text-base font-semibold shadow-xl font-body" onClick={onLogin}>
                     Belépek <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
-                  <Button size="lg" variant="outline" className="border-amber-400/40 text-amber-100 hover:bg-amber-800/50 px-8 text-base font-body" onClick={onRegister}>
+                  <Button size="lg" variant="outline" className="border-white/50 bg-transparent text-white hover:bg-white/10 hover:border-white/80 hover:text-white px-8 text-base font-body" onClick={onRegister}>
                     Regisztrálok
                   </Button>
                 </div>

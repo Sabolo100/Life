@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
 import { useInvitationStore } from '@/stores/invitation-store'
 import { LandingPage } from '@/pages/LandingPage'
@@ -9,10 +9,11 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 
 export default function App() {
   const { user, profile, loading, initialized, initialize } = useAuthStore()
-  const { acceptInvitation } = useInvitationStore()
+  const { acceptInvitation, checkEmailInvitations } = useInvitationStore()
   const [inviteToken, setInviteToken] = useState<string | null>(null)
   const [inviteResult, setInviteResult] = useState<{ success: boolean; error?: string; message?: string } | null>(null)
   const [inviteProcessing, setInviteProcessing] = useState(false)
+  const emailInviteChecked = useRef(false)
   // Show auth form (login/register) instead of landing page
   const [showAuth, setShowAuth] = useState(false)
   const [defaultAuthTab, setDefaultAuthTab] = useState<'login' | 'register'>('login')
@@ -48,6 +49,8 @@ export default function App() {
     const token = params.get('invite')
     if (token) {
       setInviteToken(token)
+      // New users with invite link should see the register tab first
+      setDefaultAuthTab('register')
       // Store in localStorage so it survives the full email confirmation flow
       // (sessionStorage is lost when Supabase redirects back after email confirm)
       localStorage.setItem('invite_token', token)
@@ -56,7 +59,10 @@ export default function App() {
     } else {
       // Check localStorage (survives email confirmation redirect)
       const stored = localStorage.getItem('invite_token')
-      if (stored) setInviteToken(stored)
+      if (stored) {
+        setInviteToken(stored)
+        setDefaultAuthTab('register')
+      }
     }
   }, [])
 
@@ -78,6 +84,25 @@ export default function App() {
     }
     process()
   }, [user, inviteToken, acceptInvitation, inviteProcessing])
+
+  // ── Auto-accept email-matched invitations after login ────────────
+  // If a user registers with an email that has pending invitations,
+  // accept them automatically — no need to click the link again.
+  useEffect(() => {
+    if (!user || emailInviteChecked.current) return
+    emailInviteChecked.current = true
+
+    const check = async () => {
+      const results = await checkEmailInvitations()
+      if (results.length > 0) {
+        setInviteResult({
+          success: true,
+          message: `${results.length} meghívó automatikusan elfogadva! Nézd meg a "Mások élete" menüpontot.`,
+        })
+      }
+    }
+    check()
+  }, [user, checkEmailInvitations])
 
   if (!initialized || loading) {
     return (
