@@ -72,7 +72,40 @@ export function Header({
           <span className="font-semibold text-sm">Emlékkönyv</span>
         </button>
       </div>
-      <div className="flex items-center gap-2">
+
+      {/* Mobile: only Chat + LifeStory quick icons */}
+      <div className="flex items-center gap-1 md:hidden">
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant="ghost" size="icon" onClick={() => { onToggleSidebar(); setMobileMenuOpen(false) }}>
+              <MessageSquare className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Beszélgetések</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant="ghost" size="icon" onClick={() => { onShowLifeStory(); setMobileMenuOpen(false) }}>
+              <FileText className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Életutam</TooltipContent>
+        </Tooltip>
+        {/* AI status dot on mobile */}
+        <Tooltip>
+          <TooltipTrigger>
+            <div className="flex items-center gap-1 px-1">
+              <div className={`w-2 h-2 rounded-full ${statusColor(aiStatus)}`} />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            {aiStatus === 'ok' ? 'AI elérhető' : aiStatus === 'error' ? 'AI nem elérhető' : 'AI ellenőrzés…'}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+
+      {/* Desktop: full icon bar */}
+      <div className="hidden md:flex items-center gap-2">
         <div className="flex items-center gap-3 mr-4">
           <Tooltip>
             <TooltipTrigger>
@@ -82,7 +115,7 @@ export function Header({
               </div>
             </TooltipTrigger>
             <TooltipContent>
-              {aiStatus === 'ok' ? 'AI elérhető' : aiStatus === 'error' ? 'AI nem elérhető' : 'Nem tesztelt'}
+              {aiStatus === 'ok' ? 'AI elérhető' : aiStatus === 'error' ? 'AI nem elérhető' : 'AI ellenőrzés…'}
             </TooltipContent>
           </Tooltip>
           <Tooltip>

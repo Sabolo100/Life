@@ -14,6 +14,8 @@ import { SharedLifeStoryView } from '@/components/views/SharedLifeStoryView'
 import { useChatStore } from '@/stores/chat-store'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { useInvitationStore } from '@/stores/invitation-store'
+import { useSettingsStore } from '@/stores/settings-store'
+import { testAIConnection } from '@/lib/ai-service'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,8 +30,9 @@ export function MainPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [questionsPanelOpen, setQuestionsPanelOpen] = useState(false)
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null)
-  const [aiStatus] = useState<'ok' | 'unknown' | 'error'>('unknown')
+  const [aiStatus, setAiStatus] = useState<'ok' | 'unknown' | 'error'>('unknown')
   const [storageStatus] = useState<'ok' | 'error'>('ok')
+  const { aiModel } = useSettingsStore()
   const [selectedShare, setSelectedShare] = useState<LifeStoryShare | null>(null)
   const sessionInitialized = useRef(false)
 
@@ -39,6 +42,14 @@ export function MainPage() {
     loadInvitations, loadIncomingShares, loadContributions, loadReceivedInvitations,
     pendingContributions, incomingShares, receivedInvitations,
   } = useInvitationStore()
+
+  // Auto-test AI on mount
+  useEffect(() => {
+    testAIConnection(aiModel).then(result => {
+      setAiStatus(result.success ? 'ok' : 'error')
+    }).catch(() => setAiStatus('error'))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const openCount = openQuestions.filter(q => q.status === 'open').length
   const pendingContribCount = pendingContributions.length
