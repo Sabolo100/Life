@@ -9,6 +9,36 @@ import { useAuthStore } from '@/stores/auth-store'
 import { exportAsJSON, exportAsPDF, exportAsDOCX } from '@/lib/export-service'
 import type { Person, LifeEvent } from '@/types'
 
+// Translation map for English relationship types from AI extraction
+const RELATIONSHIP_LABELS: Record<string, string> = {
+  parent: 'Szülő', mother: 'Anya', father: 'Apa',
+  sibling: 'Testvér', brother: 'Fivér', sister: 'Nővér',
+  child: 'Gyerek', son: 'Fia', daughter: 'Lánya',
+  spouse: 'Házastárs', husband: 'Férj', wife: 'Feleség',
+  partner: 'Partner', friend: 'Barát', colleague: 'Kolléga',
+  teacher: 'Tanár', mentor: 'Mentor', boss: 'Főnök',
+  doctor: 'Orvos', neighbor: 'Szomszéd', acquaintance: 'Ismerős',
+  grandparent: 'Nagyszülő', grandmother: 'Nagyanya', grandfather: 'Nagyapa',
+  grandchild: 'Unoka', uncle: 'Nagybácsi', aunt: 'Nagynéni',
+  cousin: 'Unokatestvér', family: 'Család', relative: 'Rokon',
+  ex_spouse: 'Volt házastárs', ex: 'Volt partner',
+}
+
+const LOCATION_TYPE_LABELS: Record<string, string> = {
+  residence: 'Lakóhely', home: 'Otthon', school: 'Iskola',
+  workplace: 'Munkahely', hospital: 'Kórház', church: 'Templom',
+  city: 'Város', town: 'Város', village: 'Falu',
+  country: 'Ország', region: 'Régió', park: 'Park',
+  office: 'Iroda', university: 'Egyetem', other: 'Egyéb',
+  birth_place: 'Születési hely', vacation: 'Nyaralóhely',
+}
+
+function translateLabel(value: string, map: Record<string, string>): string {
+  if (!value) return value
+  const lower = value.toLowerCase().trim()
+  return map[lower] || value
+}
+
 const CATEGORY_OPTIONS = [
   { value: 'career', label: 'Munkahely' },
   { value: 'education', label: 'Tanulmányok' },
@@ -145,8 +175,8 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
         </div>
       </div>
       <Tabs defaultValue="story" className="flex-1 min-h-0 flex flex-col">
-        <div className="border-b px-4 flex-shrink-0">
-          <TabsList className="h-10">
+        <div className="border-b px-4 flex-shrink-0 overflow-x-auto scrollbar-hide">
+          <TabsList className="h-10 w-max min-w-full">
             <TabsTrigger value="story">Emlékkönyv</TabsTrigger>
             <TabsTrigger value="persons">
               <Users className="w-3 h-3 mr-1" /> Személyek ({persons.length})
@@ -274,7 +304,7 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-sm">{person.name}</span>
                         {person.nickname && <span className="text-xs text-muted-foreground">({person.nickname})</span>}
-                        <Badge variant="secondary" className="text-xs">{person.relationship_type}</Badge>
+                        <Badge variant="secondary" className="text-xs">{translateLabel(person.relationship_type, RELATIONSHIP_LABELS)}</Badge>
                       </div>
                       {person.related_period && <p className="text-xs text-muted-foreground">{person.related_period}</p>}
                       {person.notes && <p className="text-xs mt-1">{person.notes}</p>}
@@ -525,7 +555,7 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
                 <div key={location.id} className="border rounded-lg p-3">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-medium text-sm">{location.name}</span>
-                    <Badge variant="secondary" className="text-xs">{location.type}</Badge>
+                    <Badge variant="secondary" className="text-xs">{translateLabel(location.type, LOCATION_TYPE_LABELS)}</Badge>
                   </div>
                   {location.related_period && <p className="text-xs text-muted-foreground">{location.related_period}</p>}
                   {location.notes && <p className="text-xs mt-1">{location.notes}</p>}

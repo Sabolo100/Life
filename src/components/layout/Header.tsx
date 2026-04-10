@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthStore } from '@/stores/auth-store'
-import { BookOpen, Settings, LogOut, Menu, FileText, Clock, MapPin, Users, UserPlus, Eye, ChevronDown } from 'lucide-react'
+import { BookOpen, Settings, LogOut, Menu, FileText, Clock, MapPin, Users, UserPlus, Eye, ChevronDown, MessageSquare, X } from 'lucide-react'
 import type { LifeStoryShare } from '@/types'
 
 interface HeaderProps {
@@ -31,6 +31,7 @@ export function Header({
 }: HeaderProps) {
   const { profile, signOut } = useAuthStore()
   const [sharesOpen, setSharesOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const sharesRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
@@ -58,12 +59,13 @@ export function Header({
   return (
     <header className="h-14 border-b border-amber-200/50 flex items-center justify-between px-4 bg-[#f8f4ee]/90 backdrop-blur sticky top-0 z-50">
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={onToggleSidebar} className="md:hidden">
-          <Menu className="w-5 h-5" />
+        {/* Mobile hamburger → opens full navigation */}
+        <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden">
+          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </Button>
         {/* Logo — acts as home button */}
         <button
-          onClick={onGoHome}
+          onClick={() => { onGoHome(); setMobileMenuOpen(false) }}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
           <BookOpen className="w-5 h-5 text-primary" />
@@ -205,6 +207,64 @@ export function Header({
           <LogOut className="w-4 h-4" />
         </Button>
       </div>
+      {/* Mobile navigation dropdown */}
+      {mobileMenuOpen && (
+        <div className="absolute top-14 left-0 right-0 bg-background border-b shadow-lg z-50 md:hidden">
+          <nav className="flex flex-col py-2">
+            {[
+              { icon: MessageSquare, label: 'Beszélgetések', action: () => onToggleSidebar() },
+              { icon: FileText, label: 'Emlékkönyv', action: onShowLifeStory },
+              { icon: Clock, label: 'Idővonal', action: onShowTimeline },
+              { icon: MapPin, label: 'Térkép', action: onShowMap },
+              { icon: Users, label: 'Kapcsolatok', action: onShowRelationships },
+              { icon: UserPlus, label: 'Meghívók & Megosztás', action: onShowInvitations, badge: totalAlerts },
+              { icon: Settings, label: 'Beállítások', action: onShowSettings },
+            ].map(({ icon: Icon, label, action, badge }) => (
+              <button
+                key={label}
+                onClick={() => { action(); setMobileMenuOpen(false) }}
+                className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted transition-colors text-left"
+              >
+                <Icon className="w-4 h-4 text-muted-foreground" />
+                <span className="flex-1">{label}</span>
+                {badge ? (
+                  <Badge variant="destructive" className="text-[10px] h-5 min-w-5 flex items-center justify-center">
+                    {badge}
+                  </Badge>
+                ) : null}
+              </button>
+            ))}
+            {/* Shared stories in mobile menu */}
+            {incomingShares.length > 0 && (
+              <>
+                <div className="border-t mx-4 my-1" />
+                <p className="px-4 py-1.5 text-[10px] uppercase text-muted-foreground font-medium">
+                  Mások élete
+                </p>
+                {incomingShares.map(share => (
+                  <button
+                    key={share.id}
+                    onClick={() => { onShowShared(share); setMobileMenuOpen(false) }}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors"
+                  >
+                    <Eye className="w-4 h-4 text-muted-foreground" />
+                    <span>{share.owner_name || 'Valaki'} emlékkönyve</span>
+                  </button>
+                ))}
+              </>
+            )}
+            {/* Logout */}
+            <div className="border-t mx-4 my-1" />
+            <button
+              onClick={() => { signOut(); setMobileMenuOpen(false) }}
+              className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted transition-colors text-left text-destructive"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Kijelentkezés</span>
+            </button>
+          </nav>
+        </div>
+      )}
     </header>
   )
 }

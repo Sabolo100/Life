@@ -167,12 +167,25 @@ export function MainPage() {
             </Tooltip>
           )}
         </main>
-        {/* Open Questions Panel */}
-        <OpenQuestionsPanel
-          open={questionsPanelOpen}
-          onClose={() => setQuestionsPanelOpen(false)}
-          onQuestionClick={handleQuestionClick}
-        />
+        {/* Open Questions Panel — inline on desktop, Sheet on mobile */}
+        <div className="hidden md:block">
+          <OpenQuestionsPanel
+            open={questionsPanelOpen}
+            onClose={() => setQuestionsPanelOpen(false)}
+            onQuestionClick={handleQuestionClick}
+          />
+        </div>
+        <div className="md:hidden">
+          <Sheet open={questionsPanelOpen} onOpenChange={setQuestionsPanelOpen}>
+            <SheetContent side="right" className="p-0 w-[85vw] max-w-80">
+              <OpenQuestionsPanel
+                open={true}
+                onClose={() => setQuestionsPanelOpen(false)}
+                onQuestionClick={handleQuestionClick}
+              />
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
     </div>
   )

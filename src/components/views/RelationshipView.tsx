@@ -415,7 +415,7 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
       groups[tier].push(p)
     })
     return groups
-  }, [persons, tierOverrides])
+  }, [filteredPersons, tierOverrides])
 
   if (persons.length === 0) {
     return (
