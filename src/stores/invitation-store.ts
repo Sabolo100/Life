@@ -82,7 +82,8 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Owner: Load invitations & shares ──────────────────────────────
 
   loadInvitations: async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
     if (!user) return
 
     const [invRes, sharesRes] = await Promise.all([
@@ -123,12 +124,8 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
 
   createInvitation: async ({ invitedEmail, invitedName, permissionLevel, expiresAt }) => {
     try {
-      const { data: userData, error: userErr } = await supabase.auth.getUser()
-      if (userErr) {
-        console.error('[createInvitation] auth error:', userErr)
-        return { data: null, error: `Hitelesítési hiba: ${userErr.message}` }
-      }
-      const user = userData?.user
+      const { data: sessionData } = await supabase.auth.getSession()
+      const user = sessionData?.session?.user
       if (!user) return { data: null, error: 'Nem vagy bejelentkezve.' }
 
       const token = generateToken()
@@ -211,7 +208,8 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Owner: Load contributions ─────────────────────────────────────
 
   loadContributions: async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
     if (!user) return
 
     const { data } = await supabase
@@ -230,7 +228,8 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Owner: Review a contribution ──────────────────────────────────
 
   reviewContribution: async (id, decision, reviewerNotes) => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
     if (!user) return
 
     const contribution = get().allContributions.find(c => c.id === id)
@@ -291,7 +290,8 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Guest: Load received invitations (where my email was invited) ──
 
   loadReceivedInvitations: async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
     if (!user?.email) return
 
     const { data } = await supabase
@@ -322,7 +322,8 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Guest: Load incoming shares ───────────────────────────────────
 
   loadIncomingShares: async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
     if (!user) return
 
     const { data } = await supabase
@@ -393,7 +394,8 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Guest: Auto-accept all pending invitations matching user email ──
 
   checkEmailInvitations: async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
     if (!user?.email) return []
 
     // Find pending invitations for this email
@@ -427,7 +429,8 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
     content,
     perspectiveType,
   }) => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
     if (!user) return
 
     // Get contributor's display name
