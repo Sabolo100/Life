@@ -122,37 +122,58 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Owner: Create invitation ──────────────────────────────────────
 
   createInvitation: async ({ invitedEmail, invitedName, permissionLevel, expiresAt }) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { data: null, error: 'Nem vagy bejelentkezve.' }
+    try {
+      const { data: userData, error: userErr } = await supabase.auth.getUser()
+      if (userErr) {
+        console.error('[createInvitation] auth error:', userErr)
+        return { data: null, error: `Hitelesítési hiba: ${userErr.message}` }
+      }
+      const user = userData?.user
+      if (!user) return { data: null, error: 'Nem vagy bejelentkezve.' }
 
-    const token = generateToken()
+      const token = generateToken()
 
-    const { data, error } = await supabase
-      .from('invitations')
-      .insert({
-        user_id: user.id,
-        invited_email: invitedEmail || null,
-        invited_name: invitedName || null,
-        token,
-        permission_level: permissionLevel,
-        status: 'pending',
-        expires_at: expiresAt || null,
-      })
-      .select()
-      .single()
+      console.log('[createInvitation] inserting for user:', user.id)
 
-    if (error) {
-      console.error('[createInvitation] error:', error)
-      // Provide a human-readable hint for the most common failure
-      const msg = error.code === '42703'
-        ? `Adatbázis hiba: hiányzó oszlop (${error.message}). Futtasd le a migrációkat a Supabase SQL szerkesztőben!`
-        : error.message || 'Ismeretlen hiba'
-      return { data: null, error: msg }
+      const { data, error } = await supabase
+        .from('invitations')
+        .insert({
+          user_id: user.id,
+          invited_email: invitedEmail || null,
+          invited_name: invitedName || null,
+          token,
+          permission_level: permissionLevel,
+          status: 'pending',
+          expires_at: expiresAt || null,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('[createInvitation] db error:', error)
+        // Provide a human-readable hint for common failures
+        let msg = error.message || 'Ismeretlen hiba'
+        if (error.code === '42703') {
+          msg = `Adatbázis hiba: hiányzó oszlop (${error.message}). Futtasd le a migrációkat a Supabase SQL szerkesztőben!`
+        } else if (error.code === '42501' || error.message?.includes('row-level security')) {
+          msg = `Jogosultsági hiba (RLS): ${error.message}`
+        } else if (error.code) {
+          msg = `${error.message} (kód: ${error.code})`
+        }
+        return { data: null, error: msg }
+      }
+
+      if (!data) {
+        return { data: null, error: 'A szerver nem adott vissza adatot (INSERT sikerült, de SELECT nem). Ellenőrizd az RLS policy-t!' }
+      }
+
+      const invitation = data as Invitation
+      set(state => ({ invitations: [invitation, ...state.invitations] }))
+      return { data: invitation, error: null }
+    } catch (err) {
+      console.error('[createInvitation] exception:', err)
+      return { data: null, error: `Kivétel: ${(err as Error).message || String(err)}` }
     }
-
-    const invitation = data as Invitation
-    set(state => ({ invitations: [invitation, ...state.invitations] }))
-    return { data: invitation, error: null }
   },
 
   // ── Owner: Revoke invitation ──────────────────────────────────────

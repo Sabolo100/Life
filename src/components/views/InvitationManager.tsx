@@ -108,31 +108,44 @@ export function InvitationManager({ onBack }: InvitationManagerProps) {
     setCreateError(null)
     setCreateLoading(true)
 
-    const expiresAt = expiresInDays
-      ? new Date(Date.now() + expiresInDays * 86400000).toISOString()
-      : null
+    try {
+      const expiresAt = expiresInDays
+        ? new Date(Date.now() + expiresInDays * 86400000).toISOString()
+        : null
 
-    const { data: inv, error } = await createInvitation({
-      invitedName: invitedName || undefined,
-      invitedEmail: invitedEmail || undefined,
-      permissionLevel: permission,
-      expiresAt,
-    })
+      console.log('[InvitationManager] creating invitation...', {
+        invitedName, invitedEmail, permission, expiresAt,
+      })
 
-    setCreateLoading(false)
+      const { data: inv, error } = await createInvitation({
+        invitedName: invitedName || undefined,
+        invitedEmail: invitedEmail || undefined,
+        permissionLevel: permission,
+        expiresAt,
+      })
 
-    if (error) {
-      setCreateError(error)
-      return
-    }
+      console.log('[InvitationManager] result:', { inv, error })
 
-    if (inv) {
-      setCreating(false)
-      setCreateError(null)
-      setInvitedName('')
-      setInvitedEmail('')
-      setPermission('reader')
-      setExpiresInDays(null)
+      if (error) {
+        setCreateError(error)
+        return
+      }
+
+      if (inv) {
+        setCreating(false)
+        setCreateError(null)
+        setInvitedName('')
+        setInvitedEmail('')
+        setPermission('reader')
+        setExpiresInDays(null)
+      } else {
+        setCreateError('Nem sikerült létrehozni a meghívót (nincs adat és nincs hibaüzenet).')
+      }
+    } catch (err) {
+      console.error('[InvitationManager] exception:', err)
+      setCreateError(`Váratlan hiba: ${(err as Error).message || String(err)}`)
+    } finally {
+      setCreateLoading(false)
     }
   }
 
