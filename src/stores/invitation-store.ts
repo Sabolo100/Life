@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/stores/auth-store'
 import type {
   Invitation,
   LifeStoryShare,
@@ -124,8 +125,8 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
 
   createInvitation: async ({ invitedEmail, invitedName, permissionLevel, expiresAt }) => {
     try {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const user = sessionData?.session?.user
+      // Read user directly from auth store — no network call, no hanging
+      const user = useAuthStore.getState().user
       if (!user) return { data: null, error: 'Nem vagy bejelentkezve.' }
 
       const token = generateToken()
