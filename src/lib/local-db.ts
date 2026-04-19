@@ -2,14 +2,13 @@
  * Local storage adapter for offline/local-only mode.
  * Mirrors the data model stored in Supabase, but keeps everything in localStorage.
  */
-import { useAuthStore } from '@/stores/auth-store'
+// useAuthStore import removed — local mode disabled
 
 const PREFIX = 'lifechat_'
 
-/** Check if the current user is in local storage mode */
+/** Local storage mode has been removed — always returns false */
 export function isLocalMode(): boolean {
-  const profile = useAuthStore.getState().profile
-  return profile?.storage_preference === 'local'
+  return false
 }
 
 function read<T>(key: string): T[] {

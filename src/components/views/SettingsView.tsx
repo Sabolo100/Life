@@ -54,10 +54,6 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 <Label>Név</Label>
                 <span className="text-sm text-muted-foreground">{profile?.display_name || '-'}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <Label>Adattárolás</Label>
-                <span className="text-sm text-muted-foreground capitalize">{profile?.storage_preference || 'cloud'}</span>
-              </div>
             </div>
           </div>
           <Separator />

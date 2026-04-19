@@ -1,4 +1,4 @@
-export type StoragePreference = 'local' | 'cloud'
+export type StoragePreference = 'cloud'
 export type TimeType = 'exact_date' | 'estimated_year' | 'life_phase' | 'uncertain'
 export type Valence = 'positive' | 'negative' | 'mixed' | 'neutral'
 export type QuestionType = 'incomplete_topic' | 'unresolved_event' | 'unclear_time' | 'missing_detail' | 'follow_up'

@@ -51,6 +51,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       },
     })
     if (error) return { error: error.message }
+    // Already-registered email: Supabase returns success but identities is empty
+    if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
+      return { error: 'Ez az email cím már regisztrálva van. Kérjük, jelentkezz be!' }
+    }
     if (data.user) {
       await supabase.from('profiles').upsert({
         id: data.user.id,

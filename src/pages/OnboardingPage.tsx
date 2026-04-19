@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { MosaicBackground } from '@/components/MosaicBackground'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth-store'
-import { BookOpen, MessageSquare, Shield, Pencil, Download, ArrowRight, Cloud, Monitor } from 'lucide-react'
-import type { StoragePreference } from '@/types'
+import { BookOpen, MessageSquare, Shield, Pencil, Download, ArrowRight } from 'lucide-react'
 
 const steps = [
   {
@@ -36,15 +35,13 @@ const steps = [
 
 export function OnboardingPage() {
   const [step, setStep] = useState(0)
-  const [storageChoice, setStorageChoice] = useState<StoragePreference>('cloud')
   const { updateProfile } = useAuthStore()
   const [saving, setSaving] = useState(false)
 
-  const isStorageStep = step === steps.length
-  const isLastStep = step === steps.length
+  const isLastStep = step === steps.length - 1
 
   const handleNext = () => {
-    if (step < steps.length) {
+    if (!isLastStep) {
       setStep(step + 1)
     }
   }
@@ -52,62 +49,11 @@ export function OnboardingPage() {
   const handleFinish = async () => {
     setSaving(true)
     await updateProfile({
-      storage_preference: storageChoice,
+      storage_preference: 'cloud',
       onboarding_completed: true,
       privacy_accepted_at: new Date().toISOString(),
     })
     setSaving(false)
-  }
-
-  if (isStorageStep) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8f4ee] relative p-4">
-        <MosaicBackground opacity={0.35} />
-        <Card className="w-full max-w-lg relative z-10 bg-[#faf7f2]/90 backdrop-blur-md shadow-xl shadow-amber-900/10 border-amber-200/50">
-          <CardHeader className="text-center">
-            <CardTitle className="text-xl">Hol tároljuk az adataidat?</CardTitle>
-            <CardDescription>Ezt később bármikor megváltoztathatod a beállításokban.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <button
-              onClick={() => setStorageChoice('cloud')}
-              className={`w-full p-4 rounded-lg border-2 text-left transition-colors ${
-                storageChoice === 'cloud' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <Cloud className="w-6 h-6 text-primary mt-0.5" />
-                <div>
-                  <p className="font-medium">Felhő (ajánlott)</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Bármely eszközödön elérheted az adataidat. Automatikus biztonsági mentés. Biztonságosan titkosítva.
-                  </p>
-                </div>
-              </div>
-            </button>
-            <button
-              onClick={() => setStorageChoice('local')}
-              className={`w-full p-4 rounded-lg border-2 text-left transition-colors ${
-                storageChoice === 'local' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <Monitor className="w-6 h-6 text-primary mt-0.5" />
-                <div>
-                  <p className="font-medium">Lokális (csak ezen az eszközön)</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Minden adat a böngésződben marad. Más eszközön export/import szükséges. Maximális adatvédelem.
-                  </p>
-                </div>
-              </div>
-            </button>
-            <Button onClick={handleFinish} className="w-full mt-6" size="lg" disabled={saving}>
-              {saving ? 'Mentés...' : 'Kezdjük el!'}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
   }
 
   const currentStep = steps[step]
@@ -131,11 +77,16 @@ export function OnboardingPage() {
               {steps.map((_, i) => (
                 <div key={i} className={`w-2 h-2 rounded-full transition-colors ${i <= step ? 'bg-primary' : 'bg-border'}`} />
               ))}
-              <div className={`w-2 h-2 rounded-full ${isLastStep ? 'bg-primary' : 'bg-border'}`} />
             </div>
-            <Button onClick={handleNext}>
-              Tovább <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+            {isLastStep ? (
+              <Button onClick={handleFinish} disabled={saving}>
+                {saving ? 'Indítás...' : 'Kezdjük el!'} <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            ) : (
+              <Button onClick={handleNext}>
+                Tovább <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
