@@ -29,7 +29,7 @@ interface InvitationState {
     invitedName?: string
     permissionLevel: PermissionLevel
     expiresAt?: string | null
-  }) => Promise<Invitation | null>
+  }) => Promise<{ data: Invitation | null; error: string | null }>
   revokeInvitation: (id: string) => Promise<void>
   revokeShare: (id: string) => Promise<void>
   updateSharePermission: (id: string, level: PermissionLevel) => Promise<void>
@@ -123,7 +123,7 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
 
   createInvitation: async ({ invitedEmail, invitedName, permissionLevel, expiresAt }) => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
+    if (!user) return { data: null, error: 'Nem vagy bejelentkezve.' }
 
     const token = generateToken()
 
@@ -143,12 +143,16 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
 
     if (error) {
       console.error('[createInvitation] error:', error)
-      return null
+      // Provide a human-readable hint for the most common failure
+      const msg = error.code === '42703'
+        ? `Adatbázis hiba: hiányzó oszlop (${error.message}). Futtasd le a migrációkat a Supabase SQL szerkesztőben!`
+        : error.message || 'Ismeretlen hiba'
+      return { data: null, error: msg }
     }
 
     const invitation = data as Invitation
     set(state => ({ invitations: [invitation, ...state.invitations] }))
-    return invitation
+    return { data: invitation, error: null }
   },
 
   // ── Owner: Revoke invitation ──────────────────────────────────────

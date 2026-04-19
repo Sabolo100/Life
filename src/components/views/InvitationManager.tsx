@@ -84,6 +84,8 @@ export function InvitationManager({ onBack }: InvitationManagerProps) {
   const [reviewNotes, setReviewNotes] = useState('')
 
   const [acceptingToken, setAcceptingToken] = useState<string | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [createLoading, setCreateLoading] = useState(false)
 
   useEffect(() => {
     loadInvitations()
@@ -103,19 +105,30 @@ export function InvitationManager({ onBack }: InvitationManagerProps) {
   const appUrl = window.location.origin
 
   const handleCreate = async () => {
+    setCreateError(null)
+    setCreateLoading(true)
+
     const expiresAt = expiresInDays
       ? new Date(Date.now() + expiresInDays * 86400000).toISOString()
       : null
 
-    const inv = await createInvitation({
+    const { data: inv, error } = await createInvitation({
       invitedName: invitedName || undefined,
       invitedEmail: invitedEmail || undefined,
       permissionLevel: permission,
       expiresAt,
     })
 
+    setCreateLoading(false)
+
+    if (error) {
+      setCreateError(error)
+      return
+    }
+
     if (inv) {
       setCreating(false)
+      setCreateError(null)
       setInvitedName('')
       setInvitedEmail('')
       setPermission('reader')
@@ -290,12 +303,18 @@ export function InvitationManager({ onBack }: InvitationManagerProps) {
                   </div>
                 </div>
 
+                {createError && (
+                  <div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+                    ⚠️ {createError}
+                  </div>
+                )}
+
                 <div className="flex gap-2 pt-1">
-                  <Button onClick={handleCreate} className="flex-1 gap-1">
+                  <Button onClick={handleCreate} className="flex-1 gap-1" disabled={createLoading}>
                     <Link2 className="w-3.5 h-3.5" />
-                    Meghívó létrehozása
+                    {createLoading ? 'Létrehozás...' : 'Meghívó létrehozása'}
                   </Button>
-                  <Button variant="ghost" onClick={() => setCreating(false)}>
+                  <Button variant="ghost" onClick={() => { setCreating(false); setCreateError(null) }}>
                     Mégse
                   </Button>
                 </div>
