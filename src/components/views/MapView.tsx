@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, MapPin, Search, Loader2, Check, X, Navigation, ChevronDown, ChevronUp, Edit2, Trash2, List, Map } from 'lucide-react'
+import { MapPin, Search, Loader2, Check, X, Navigation, ChevronDown, ChevronUp, Edit2, Trash2, List, Map } from 'lucide-react'
 import type { Location } from '@/types'
 
 // Fix Leaflet default icon issue with bundlers
@@ -104,7 +104,7 @@ const LOCATION_TYPE_LABELS: Record<string, string> = {
 
 interface MapViewProps { onBack: () => void }
 
-export function MapView({ onBack }: MapViewProps) {
+export function MapView({ onBack: _onBack }: MapViewProps) {
   const { locations, geocodeLocation, confirmLocation, updateLocationCoordinates, deleteLocation } = useLifeStoryStore()
 
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map')
@@ -210,10 +210,6 @@ export function MapView({ onBack }: MapViewProps) {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="border-b px-3 py-2.5 flex items-center gap-2 shrink-0 flex-wrap">
-        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <h2 className="font-semibold">Térkép</h2>
         <div className="flex items-center gap-1.5 flex-wrap">
           {confirmedCount > 0 && (
             <Badge variant="secondary" className="text-xs gap-1">

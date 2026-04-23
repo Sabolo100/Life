@@ -5,14 +5,14 @@ import { testAIConnection, type AITestResult } from '@/lib/ai-service'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, Loader2, CheckCircle2, XCircle, Zap } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Zap } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface SettingsViewProps {
   onBack: () => void
 }
 
-export function SettingsView({ onBack }: SettingsViewProps) {
+export function SettingsView({ onBack: _onBack }: SettingsViewProps) {
   const settings = useSettingsStore()
   const { profile } = useAuthStore()
   const [testing, setTesting] = useState(false)
@@ -40,10 +40,6 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   return (
     <div className="flex flex-col h-full">
       <div className="border-b px-4 py-3 flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <h2 className="font-semibold">Beállítások</h2>
       </div>
       <ScrollArea className="flex-1 p-4">
         <div className="max-w-lg mx-auto space-y-6">

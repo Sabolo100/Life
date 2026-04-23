@@ -3,7 +3,7 @@ import { useLifeStoryStore } from '@/stores/life-story-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Users, X, ZoomIn, ZoomOut, Maximize2, Network, GitBranchPlus, List, Plus, Pencil, Trash2, Check } from 'lucide-react'
+import { Users, X, ZoomIn, ZoomOut, Maximize2, Network, GitBranchPlus, List, Plus, Pencil, Trash2, Check } from 'lucide-react'
 import type { Person, LifeEvent } from '@/types'
 import { supabase } from '@/lib/supabase'
 import { FamilyTreeView } from './FamilyTreeView'
@@ -233,7 +233,7 @@ interface ContextMenuState {
   currentTier: number
 }
 
-export function RelationshipView({ onBack }: RelationshipViewProps) {
+export function RelationshipView({ onBack: _onBack }: RelationshipViewProps) {
   const { persons, events, loadAll, addPerson, updatePerson, deletePerson } = useLifeStoryStore()
   const { profile } = useAuthStore()
   const [viewMode, setViewMode] = useState<ViewMode>('network')
@@ -447,8 +447,6 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
     return (
       <div className="h-full flex flex-col">
         <div className="flex items-center gap-2 p-4 border-b">
-          <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="w-4 h-4" /></Button>
-          <h2 className="font-semibold">Személyek</h2>
         </div>
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center space-y-3">
@@ -472,8 +470,6 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
-        <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="w-4 h-4" /></Button>
-        <h2 className="font-semibold">Személyek</h2>
         <Badge variant="secondary" className="text-xs">{persons.length}</Badge>
 
         {/* View mode tabs */}

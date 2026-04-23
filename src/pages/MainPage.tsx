@@ -148,7 +148,7 @@ export function MainPage() {
       )}
       <MosaicBackground opacity={0.3} />
       <Header
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        onToggleSidebar={() => { setCurrentView('chat'); setSidebarOpen(!sidebarOpen) }}
         onGoHome={() => setCurrentView('chat')}
         onShowLifeStory={() => toggleView('lifeStory')}
         onShowTimeline={() => toggleView('timeline')}
@@ -166,15 +166,19 @@ export function MainPage() {
       />
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
-        <div className="hidden md:flex md:flex-col w-64 border-r bg-[#f8f4ee]/80 backdrop-blur-sm relative z-10">
-          <SessionSidebar onSessionSelect={() => setCurrentView('chat')} />
-        </div>
+        {currentView === 'chat' && (
+          <div className="hidden md:flex md:flex-col w-64 border-r bg-[#f8f4ee]/80 backdrop-blur-sm relative z-10">
+            <SessionSidebar onSessionSelect={() => setCurrentView('chat')} />
+          </div>
+        )}
         {/* Mobile sidebar */}
-        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent side="left" className="p-0 w-72">
-            <SessionSidebar onClose={() => setSidebarOpen(false)} onSessionSelect={() => setCurrentView('chat')} />
-          </SheetContent>
-        </Sheet>
+        {currentView === 'chat' && (
+          <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+            <SheetContent side="left" className="p-0 w-72">
+              <SessionSidebar onClose={() => setSidebarOpen(false)} onSessionSelect={() => setCurrentView('chat')} />
+            </SheetContent>
+          </Sheet>
+        )}
         {/* Main content */}
         <main className="flex-1 overflow-hidden relative z-10 bg-[#f8f4ee]/60">
           {currentView === 'chat' && (
@@ -206,7 +210,7 @@ export function MainPage() {
             <SharedLifeStoryView share={selectedShare} onBack={() => setCurrentView('chat')} />
           )}
           {/* Open Questions toggle button */}
-          {!questionsPanelOpen && (
+          {currentView === 'chat' && !questionsPanelOpen && (
             <Tooltip>
               <TooltipTrigger>
                 <Button
@@ -231,24 +235,28 @@ export function MainPage() {
           )}
         </main>
         {/* Open Questions Panel — inline on desktop, Sheet on mobile */}
-        <div className="hidden md:block">
-          <OpenQuestionsPanel
-            open={questionsPanelOpen}
-            onClose={() => setQuestionsPanelOpen(false)}
-            onQuestionClick={handleQuestionClick}
-          />
-        </div>
-        <div className="md:hidden">
-          <Sheet open={questionsPanelOpen} onOpenChange={setQuestionsPanelOpen}>
-            <SheetContent side="right" className="p-0 w-[85vw] max-w-80">
-              <OpenQuestionsPanel
-                open={true}
-                onClose={() => setQuestionsPanelOpen(false)}
-                onQuestionClick={handleQuestionClick}
-              />
-            </SheetContent>
-          </Sheet>
-        </div>
+        {currentView === 'chat' && (
+          <div className="hidden md:block">
+            <OpenQuestionsPanel
+              open={questionsPanelOpen}
+              onClose={() => setQuestionsPanelOpen(false)}
+              onQuestionClick={handleQuestionClick}
+            />
+          </div>
+        )}
+        {currentView === 'chat' && (
+          <div className="md:hidden">
+            <Sheet open={questionsPanelOpen} onOpenChange={setQuestionsPanelOpen}>
+              <SheetContent side="right" className="p-0 w-[85vw] max-w-80">
+                <OpenQuestionsPanel
+                  open={true}
+                  onClose={() => setQuestionsPanelOpen(false)}
+                  onQuestionClick={handleQuestionClick}
+                />
+              </SheetContent>
+            </Sheet>
+          </div>
+        )}
       </div>
     </div>
   )

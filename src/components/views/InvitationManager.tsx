@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  ArrowLeft, UserPlus, Copy, Check, X, Trash2, Clock, Eye,
+  UserPlus, Copy, Check, X, Trash2, Clock, Eye,
   MessageSquare, PenLine, Edit3,
   Link2, Mail, Shield, Users, Bell, CheckCircle2, XCircle, AlertCircle, Inbox,
 } from 'lucide-react'
@@ -61,7 +61,7 @@ interface InvitationManagerProps {
   onBack: () => void
 }
 
-export function InvitationManager({ onBack }: InvitationManagerProps) {
+export function InvitationManager({ onBack: _onBack }: InvitationManagerProps) {
   const {
     invitations, outgoingShares, pendingContributions, allContributions,
     receivedInvitations,
@@ -185,11 +185,7 @@ export function InvitationManager({ onBack }: InvitationManagerProps) {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="border-b px-4 py-3 flex items-center gap-2 shrink-0">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
         <Users className="w-5 h-5 text-primary" />
-        <h2 className="font-semibold">Meghívók & Megosztás</h2>
         {pendingContributions.length > 0 && (
           <Badge variant="destructive" className="text-xs">
             {pendingContributions.length} jóváhagyásra vár

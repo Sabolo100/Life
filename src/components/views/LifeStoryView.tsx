@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Download, FileText, FileJson } from 'lucide-react'
+import { Download, FileText, FileJson } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth-store'
 import { exportAsJSON, exportAsPDF, exportAsDOCX } from '@/lib/export-service'
 
@@ -63,7 +63,7 @@ export function sortEventsByTime(events: { exact_date?: string | null; estimated
   })
 }
 
-export function LifeStoryView({ onBack }: LifeStoryViewProps) {
+export function LifeStoryView({ onBack: _onBack }: LifeStoryViewProps) {
   const { lifeStory, events, locations, timePeriods, emotions, openQuestions, persons } = useLifeStoryStore()
   const { profile } = useAuthStore()
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -91,10 +91,6 @@ export function LifeStoryView({ onBack }: LifeStoryViewProps) {
   return (
     <div className="flex flex-col h-full">
       <div className="border-b px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="w-4 h-4" /></Button>
-          <h2 className="font-semibold">Életutam</h2>
-        </div>
         <div className="relative">
           <Button variant="outline" size="sm" onClick={() => setShowExportMenu(!showExportMenu)}>
             <Download className="w-4 h-4 mr-1" /> Export

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthStore } from '@/stores/auth-store'
-import { BookOpen, Settings, LogOut, Menu, FileText, Clock, MapPin, Users, UserPlus, Eye, ChevronDown, MessageSquare, X, AlertCircle } from 'lucide-react'
+import { BookOpen, Settings, LogOut, FileText, Clock, MapPin, Users, UserPlus, Eye, ChevronDown, MessageSquare, AlertCircle } from 'lucide-react'
 import type { LifeStoryShare } from '@/types'
 
 interface HeaderProps {
@@ -32,7 +32,6 @@ export function Header({
 }: HeaderProps) {
   const { profile, signOut } = useAuthStore()
   const [sharesOpen, setSharesOpen] = useState(false)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const sharesRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
@@ -58,79 +57,29 @@ export function Header({
   const totalAlerts = pendingContribCount + pendingReceivedInvites
 
   return (
-    <header className="h-14 border-b border-amber-200/50 flex items-center justify-between px-4 bg-[#f8f4ee]/90 backdrop-blur sticky top-0 z-50">
-      <div className="flex items-center gap-2">
-        {/* Mobile hamburger → opens full navigation */}
-        <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden">
-          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </Button>
+    <header className="h-14 border-b border-amber-200/50 flex items-center px-4 gap-1 bg-[#f8f4ee]/90 backdrop-blur sticky top-0 z-50">
+      {/* LEFT side */}
+      <div className="flex items-center gap-1">
         {/* Logo — acts as home button */}
         <button
-          onClick={() => { onGoHome(); setMobileMenuOpen(false) }}
-          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          onClick={onGoHome}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity mr-1"
         >
           <BookOpen className="w-5 h-5 text-primary" />
           <span className="font-semibold text-sm">Emlékkönyv</span>
         </button>
-      </div>
 
-      {/* Mobile: only Chat + LifeStory quick icons */}
-      <div className="flex items-center gap-1 md:hidden">
+        {/* Chat icon */}
         <Tooltip>
           <TooltipTrigger>
-            <Button variant="ghost" size="icon" onClick={() => { onToggleSidebar(); setMobileMenuOpen(false) }}>
+            <Button variant="ghost" size="icon" onClick={onToggleSidebar}>
               <MessageSquare className="w-4 h-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Beszélgetések</TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger>
-            <Button variant="ghost" size="icon" onClick={() => { onShowLifeStory(); setMobileMenuOpen(false) }}>
-              <FileText className="w-4 h-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Életutam</TooltipContent>
-        </Tooltip>
-        {/* AI status dot on mobile */}
-        <Tooltip>
-          <TooltipTrigger>
-            <div className="flex items-center gap-1 px-1">
-              <div className={`w-2 h-2 rounded-full ${statusColor(aiStatus)}`} />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            {aiStatus === 'ok' ? 'AI elérhető' : aiStatus === 'error' ? 'AI nem elérhető' : 'AI ellenőrzés…'}
-          </TooltipContent>
-        </Tooltip>
-      </div>
 
-      {/* Desktop: full icon bar */}
-      <div className="hidden md:flex items-center gap-2">
-        <div className="flex items-center gap-3 mr-4">
-          <Tooltip>
-            <TooltipTrigger>
-              <div className="flex items-center gap-1.5">
-                <div className={`w-2 h-2 rounded-full ${statusColor(aiStatus)}`} />
-                <span className="text-xs text-muted-foreground">AI</span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              {aiStatus === 'ok' ? 'AI elérhető' : aiStatus === 'error' ? 'AI nem elérhető' : 'AI ellenőrzés…'}
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger>
-              <div className="flex items-center gap-1.5">
-                <div className={`w-2 h-2 rounded-full ${statusColor(storageStatus)}`} />
-                <span className="text-xs text-muted-foreground">Tárolás</span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              {storageStatus === 'ok' ? 'Szinkronban' : 'Szinkronizációs hiba'}
-            </TooltipContent>
-          </Tooltip>
-        </div>
+        {/* Life story icon */}
         <Tooltip>
           <TooltipTrigger>
             <Button variant="ghost" size="icon" onClick={onShowLifeStory}>
@@ -139,6 +88,8 @@ export function Header({
           </TooltipTrigger>
           <TooltipContent>Emlékkönyv</TooltipContent>
         </Tooltip>
+
+        {/* Timeline icon */}
         <Tooltip>
           <TooltipTrigger>
             <Button variant="ghost" size="icon" onClick={onShowTimeline}>
@@ -147,14 +98,18 @@ export function Header({
           </TooltipTrigger>
           <TooltipContent>Idővonal</TooltipContent>
         </Tooltip>
+
+        {/* Map icon */}
         <Tooltip>
           <TooltipTrigger>
             <Button variant="ghost" size="icon" onClick={onShowMap}>
               <MapPin className="w-4 h-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Térkép</TooltipContent>
+          <TooltipContent>Helyszínek</TooltipContent>
         </Tooltip>
+
+        {/* Relationships icon */}
         <Tooltip>
           <TooltipTrigger>
             <Button variant="ghost" size="icon" onClick={onShowRelationships}>
@@ -170,13 +125,13 @@ export function Header({
             <Tooltip>
               <TooltipTrigger>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  className="gap-1.5 text-xs h-9 px-2.5"
+                  className="gap-1 text-xs h-8"
                   onClick={() => setSharesOpen(!sharesOpen)}
                 >
                   <Eye className="w-4 h-4" />
-                  <span className="hidden sm:inline">Mások élete</span>
+                  <span>Mások élete</span>
                   {hasNewShares && <AlertCircle className="w-3.5 h-3.5 text-amber-500" />}
                   <ChevronDown className="w-3 h-3" />
                 </Button>
@@ -184,7 +139,7 @@ export function Header({
               <TooltipContent>Megosztott emlékkönyvek</TooltipContent>
             </Tooltip>
             {sharesOpen && (
-              <div className="absolute right-0 top-full mt-1 w-60 bg-background border rounded-xl shadow-xl z-50 py-1">
+              <div className="absolute left-0 top-full mt-1 w-60 bg-background border rounded-xl shadow-xl z-50 py-1">
                 <p className="px-3 py-1.5 text-[10px] uppercase text-muted-foreground font-medium">
                   Megosztva velem
                 </p>
@@ -210,7 +165,11 @@ export function Header({
             )}
           </div>
         )}
+      </div>
 
+      {/* RIGHT side */}
+      <div className="flex items-center gap-1 ml-auto">
+        {/* Invitations with badge */}
         <Tooltip>
           <TooltipTrigger>
             <Button variant="ghost" size="icon" onClick={onShowInvitations} className="relative">
@@ -227,6 +186,34 @@ export function Header({
           </TooltipTrigger>
           <TooltipContent>Meghívók & Megosztás</TooltipContent>
         </Tooltip>
+
+        {/* AI status */}
+        <Tooltip>
+          <TooltipTrigger>
+            <div className="flex items-center gap-1.5 px-1 cursor-default">
+              <div className={`w-2 h-2 rounded-full ${statusColor(aiStatus)}`} />
+              <span className="text-xs text-muted-foreground">AI</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            {aiStatus === 'ok' ? 'AI elérhető' : aiStatus === 'error' ? 'AI nem elérhető' : 'AI ellenőrzés…'}
+          </TooltipContent>
+        </Tooltip>
+
+        {/* Storage status — desktop only */}
+        <Tooltip>
+          <TooltipTrigger>
+            <div className="hidden sm:flex items-center gap-1.5 px-1 cursor-default">
+              <div className={`w-2 h-2 rounded-full ${statusColor(storageStatus)}`} />
+              <span className="text-xs text-muted-foreground">Tárolás</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            {storageStatus === 'ok' ? 'Szinkronban' : 'Szinkronizációs hiba'}
+          </TooltipContent>
+        </Tooltip>
+
+        {/* Settings */}
         <Tooltip>
           <TooltipTrigger>
             <Button variant="ghost" size="icon" onClick={onShowSettings}>
@@ -235,71 +222,17 @@ export function Header({
           </TooltipTrigger>
           <TooltipContent>Beállítások</TooltipContent>
         </Tooltip>
+
+        {/* Profile name */}
         {profile && (
           <span className="text-sm text-muted-foreground hidden sm:inline">{profile.display_name}</span>
         )}
+
+        {/* Logout */}
         <Button variant="ghost" size="icon" onClick={signOut}>
           <LogOut className="w-4 h-4" />
         </Button>
       </div>
-      {/* Mobile navigation dropdown */}
-      {mobileMenuOpen && (
-        <div className="absolute top-14 left-0 right-0 bg-background border-b shadow-lg z-50 md:hidden">
-          <nav className="flex flex-col py-2">
-            {[
-              { icon: MessageSquare, label: 'Beszélgetések', action: () => onToggleSidebar() },
-              { icon: FileText, label: 'Emlékkönyv', action: onShowLifeStory },
-              { icon: Clock, label: 'Idővonal', action: onShowTimeline },
-              { icon: MapPin, label: 'Térkép', action: onShowMap },
-              { icon: Users, label: 'Kapcsolatok', action: onShowRelationships },
-              { icon: UserPlus, label: 'Meghívók & Megosztás', action: onShowInvitations, badge: totalAlerts },
-              { icon: Settings, label: 'Beállítások', action: onShowSettings },
-            ].map(({ icon: Icon, label, action, badge }) => (
-              <button
-                key={label}
-                onClick={() => { action(); setMobileMenuOpen(false) }}
-                className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted transition-colors text-left"
-              >
-                <Icon className="w-4 h-4 text-muted-foreground" />
-                <span className="flex-1">{label}</span>
-                {badge ? (
-                  <Badge variant="destructive" className="text-[10px] h-5 min-w-5 flex items-center justify-center">
-                    {badge}
-                  </Badge>
-                ) : null}
-              </button>
-            ))}
-            {/* Shared stories in mobile menu */}
-            {incomingShares.length > 0 && (
-              <>
-                <div className="border-t mx-4 my-1" />
-                <p className="px-4 py-1.5 text-[10px] uppercase text-muted-foreground font-medium">
-                  Mások élete
-                </p>
-                {incomingShares.map(share => (
-                  <button
-                    key={share.id}
-                    onClick={() => { onShowShared(share); setMobileMenuOpen(false) }}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors"
-                  >
-                    <Eye className="w-4 h-4 text-muted-foreground" />
-                    <span>{share.owner_name || 'Valaki'} emlékkönyve</span>
-                  </button>
-                ))}
-              </>
-            )}
-            {/* Logout */}
-            <div className="border-t mx-4 my-1" />
-            <button
-              onClick={() => { signOut(); setMobileMenuOpen(false) }}
-              className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted transition-colors text-left text-destructive"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Kijelentkezés</span>
-            </button>
-          </nav>
-        </div>
-      )}
     </header>
   )
 }

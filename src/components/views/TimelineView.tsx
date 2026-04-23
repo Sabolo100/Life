@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, MessageCircle, ZoomIn, ZoomOut, Maximize2, List, Clock, Check, X, Pencil, Trash2 } from 'lucide-react'
+import { MessageCircle, ZoomIn, ZoomOut, Maximize2, List, Clock, Check, X, Pencil, Trash2 } from 'lucide-react'
 import type { LifeEvent } from '@/types'
 
 interface TimelineViewProps {
@@ -298,7 +298,7 @@ function sortEventsByTime(events: { exact_date?: string | null; estimated_year?:
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function TimelineView({ onBack }: TimelineViewProps) {
+export function TimelineView({ onBack: _onBack }: TimelineViewProps) {
   const { events, timePeriods, lifeStory, updateEvent, deleteEvent } = useLifeStoryStore()
   const [zoom, setZoom] = useState(1)
   const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline')
@@ -443,10 +443,6 @@ export function TimelineView({ onBack }: TimelineViewProps) {
     return (
       <div className="flex flex-col h-full overflow-hidden">
         <div className="border-b px-4 py-3 flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <h2 className="font-semibold">Idővonal</h2>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center py-20 text-muted-foreground">
@@ -469,10 +465,6 @@ export function TimelineView({ onBack }: TimelineViewProps) {
       {/* Header */}
       <div className="border-b px-3 py-2 flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">
-          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <h2 className="font-semibold text-sm truncate">Idővonal</h2>
           <Badge variant="secondary" className="text-xs shrink-0">{events.length}</Badge>
         </div>
 
