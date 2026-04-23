@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, MessageCircle, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
+import { ArrowLeft, MessageCircle, ZoomIn, ZoomOut, Maximize2, List, Clock, Check, X, Pencil, Trash2 } from 'lucide-react'
 import type { LifeEvent } from '@/types'
 
 interface TimelineViewProps {
@@ -270,11 +270,41 @@ const MIN_BLOCK_WIDTH = 4
 // Minimum display width for point events so the title always fits
 const MIN_POINT_DISPLAY_WIDTH = 76
 
+// ── CATEGORY_OPTIONS for list view ────────────────────────────────────────────
+
+const CATEGORY_OPTIONS = [
+  { value: 'career', label: 'Munkahely' },
+  { value: 'education', label: 'Tanulmányok' },
+  { value: 'relationship', label: 'Kapcsolat' },
+  { value: 'family', label: 'Család' },
+  { value: 'residence', label: 'Lakóhely' },
+  { value: 'travel', label: 'Utazás' },
+  { value: 'health', label: 'Egészség' },
+  { value: 'sport', label: 'Sport' },
+  { value: 'entertainment', label: 'Szórakozás' },
+  { value: 'childhood', label: 'Gyermekkor' },
+  { value: 'other', label: 'Egyéb' },
+]
+
+function sortEventsByTime(events: { exact_date?: string | null; estimated_year?: number | null; life_phase?: string | null; created_at?: string }[]) {
+  return [...events].sort((a, b) => {
+    const yearA = a.estimated_year ?? (a.exact_date ? new Date(a.exact_date).getFullYear() : 9999)
+    const yearB = b.estimated_year ?? (b.exact_date ? new Date(b.exact_date).getFullYear() : 9999)
+    if (yearA !== yearB) return yearA - yearB
+    if (a.exact_date && b.exact_date) return a.exact_date.localeCompare(b.exact_date)
+    return 0
+  })
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function TimelineView({ onBack }: TimelineViewProps) {
-  const { events, timePeriods, lifeStory } = useLifeStoryStore()
+  const { events, timePeriods, lifeStory, updateEvent, deleteEvent } = useLifeStoryStore()
   const [zoom, setZoom] = useState(1)
+  const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline')
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
+  const [editingEvent, setEditingEvent] = useState<Partial<LifeEvent> | null>(null)
+  const [eventSaving, setEventSaving] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<LifeEvent | null>(null)
   const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null)
   const [collapsedTracks, setCollapsedTracks] = useState<Set<string>>(new Set())
@@ -447,27 +477,233 @@ export function TimelineView({ onBack }: TimelineViewProps) {
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomOut} title="Kicsinyítés">
-            <ZoomOut className="w-3.5 h-3.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs gap-1"
+            onClick={() => setViewMode(viewMode === 'timeline' ? 'list' : 'timeline')}
+            title={viewMode === 'timeline' ? 'Lista nézet' : 'Idővonal nézet'}
+          >
+            {viewMode === 'timeline' ? <><List className="w-3.5 h-3.5" /> Lista nézet</> : <><Clock className="w-3.5 h-3.5" /> Idővonal nézet</>}
           </Button>
-          <span className="text-xs text-muted-foreground w-9 text-center tabular-nums">
-            {Math.round(zoom * 100)}%
-          </span>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomIn} title="Nagyítás">
-            <ZoomIn className="w-3.5 h-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomFit} title="Illesztés">
-            <Maximize2 className="w-3.5 h-3.5" />
-          </Button>
+          {viewMode === 'timeline' && (
+            <>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomOut} title="Kicsinyítés">
+                <ZoomOut className="w-3.5 h-3.5" />
+              </Button>
+              <span className="text-xs text-muted-foreground w-9 text-center tabular-nums">
+                {Math.round(zoom * 100)}%
+              </span>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomIn} title="Nagyítás">
+                <ZoomIn className="w-3.5 h-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomFit} title="Illesztés">
+                <Maximize2 className="w-3.5 h-3.5" />
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
+      {/* List view */}
+      {viewMode === 'list' && (
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="max-w-2xl mx-auto space-y-3">
+            {events.length === 0 ? (
+              <p className="text-center py-20 text-muted-foreground">Még nincsenek események az életutadban.</p>
+            ) : (sortEventsByTime(events) as typeof events).map(event => {
+              const isEditing = editingEventId === event.id
+
+              if (isEditing && editingEvent) {
+                return (
+                  <div key={event.id} className="border-2 border-primary rounded-lg p-3 space-y-2 bg-muted/30">
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={editingEvent.title || ''}
+                        onChange={e => setEditingEvent({ ...editingEvent, title: e.target.value })}
+                        placeholder="Cím"
+                        className="w-full text-sm font-medium border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <div className="flex gap-2">
+                        <select
+                          value={editingEvent.category || ''}
+                          onChange={e => setEditingEvent({ ...editingEvent, category: e.target.value })}
+                          className="flex-1 text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary"
+                        >
+                          {CATEGORY_OPTIONS.map(o => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                        <label className="flex items-center gap-1.5 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={editingEvent.is_turning_point || false}
+                            onChange={e => setEditingEvent({ ...editingEvent, is_turning_point: e.target.checked })}
+                          />
+                          Fordulópont
+                        </label>
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={editingEvent.exact_date || ''}
+                          onChange={e => setEditingEvent({ ...editingEvent, exact_date: e.target.value || null, time_type: e.target.value ? 'exact_date' : editingEvent.time_type })}
+                          placeholder="Pontos dátum (ÉÉÉÉ-HH-NN)"
+                          className="flex-1 text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary font-mono"
+                        />
+                        <input
+                          type="number"
+                          value={editingEvent.estimated_year ?? ''}
+                          onChange={e => {
+                            const y = e.target.value ? parseInt(e.target.value) : null
+                            setEditingEvent({ ...editingEvent, estimated_year: y, time_type: y ? 'estimated_year' : editingEvent.time_type })
+                          }}
+                          placeholder="Év"
+                          className="w-20 text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary font-mono"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={editingEvent.life_phase || ''}
+                        onChange={e => setEditingEvent({ ...editingEvent, life_phase: e.target.value || null })}
+                        placeholder="Időszak (pl. 2000-2010)"
+                        className="w-full text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary font-mono"
+                      />
+                      <textarea
+                        value={editingEvent.description || ''}
+                        onChange={e => setEditingEvent({ ...editingEvent, description: e.target.value || null })}
+                        placeholder="Leírás"
+                        rows={2}
+                        className="w-full text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary resize-none"
+                      />
+                      <textarea
+                        value={editingEvent.narrative_text || ''}
+                        onChange={e => setEditingEvent({ ...editingEvent, narrative_text: e.target.value || null })}
+                        placeholder="Elbeszélő szöveg (E/1)"
+                        rows={2}
+                        className="w-full text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary resize-none italic"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="text-xs"
+                        disabled={eventSaving || !editingEvent.title?.trim()}
+                        onClick={async () => {
+                          setEventSaving(true)
+                          try {
+                            const updates: Partial<LifeEvent> = {
+                              title: editingEvent.title,
+                              category: editingEvent.category,
+                              is_turning_point: editingEvent.is_turning_point,
+                              exact_date: editingEvent.exact_date,
+                              estimated_year: editingEvent.estimated_year,
+                              life_phase: editingEvent.life_phase,
+                              description: editingEvent.description,
+                              narrative_text: editingEvent.narrative_text,
+                            }
+                            if (editingEvent.exact_date) updates.time_type = 'exact_date'
+                            else if (editingEvent.estimated_year) updates.time_type = 'estimated_year'
+                            else if (editingEvent.life_phase) updates.time_type = 'life_phase'
+                            await updateEvent(event.id, updates)
+                            setEditingEventId(null)
+                            setEditingEvent(null)
+                          } catch (err) {
+                            console.error('Update event error:', err)
+                          } finally {
+                            setEventSaving(false)
+                          }
+                        }}
+                      >
+                        <Check className="w-3.5 h-3.5 mr-1" /> Mentés
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => { setEditingEventId(null); setEditingEvent(null) }}
+                      >
+                        <X className="w-3.5 h-3.5 mr-1" /> Mégse
+                      </Button>
+                    </div>
+                  </div>
+                )
+              }
+
+              return (
+                <div key={event.id} className="border rounded-lg p-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="font-medium text-sm">{event.title}</span>
+                        <Badge variant="secondary" className="text-xs">{CATEGORY_OPTIONS.find(c => c.value === event.category)?.label || event.category}</Badge>
+                        {event.is_turning_point && <Badge variant="default" className="text-xs">Fordulópont</Badge>}
+                      </div>
+                      {event.narrative_text && <p className="text-xs mt-1 italic text-muted-foreground">{event.narrative_text}</p>}
+                      {event.description && <p className="text-xs mt-1">{event.description}</p>}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {event.exact_date || (event.estimated_year ? `~${event.estimated_year}` : event.life_phase || event.uncertain_time || 'Ismeretlen időpont')}
+                      </p>
+                    </div>
+                    <div className="flex gap-1 ml-2 flex-shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        title="Szerkesztés"
+                        onClick={() => {
+                          setEditingEventId(event.id)
+                          setEditingEvent({
+                            title: event.title,
+                            category: event.category,
+                            is_turning_point: event.is_turning_point,
+                            exact_date: event.exact_date,
+                            estimated_year: event.estimated_year,
+                            life_phase: event.life_phase,
+                            time_type: event.time_type,
+                            description: event.description,
+                            narrative_text: event.narrative_text,
+                          })
+                        }}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 hover:text-destructive"
+                        title="Törlés"
+                        onClick={async () => {
+                          if (confirm(`Biztosan törölni szeretnéd "${event.title}" eseményt?`)) {
+                            try {
+                              await deleteEvent(event.id)
+                            } catch (err) {
+                              console.error('Delete event error:', err)
+                            }
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Mobile scroll hint */}
+      {viewMode === 'timeline' && (
       <div className="sm:hidden text-center text-[10px] text-muted-foreground py-1 bg-muted/30 shrink-0">
         ← csúsztass vízszintesen →
       </div>
+      )}
 
       {/* Main timeline area — min-w-0 keeps the flex child from expanding beyond parent */}
+      {viewMode === 'timeline' && (
       <div className="flex-1 min-w-0 overflow-auto relative overscroll-contain" ref={scrollRef}
         style={{ WebkitOverflowScrolling: 'touch' }}>
         <svg
@@ -729,9 +965,10 @@ export function TimelineView({ onBack }: TimelineViewProps) {
 
         </svg>
       </div>
+      )}
 
       {/* ─── Floating tooltip on hover ─── */}
-      {selectedEvent && popupPos && (
+      {viewMode === 'timeline' && selectedEvent && popupPos && (
         <div
           className="absolute z-50 pointer-events-none"
           style={{

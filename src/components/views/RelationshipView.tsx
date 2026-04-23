@@ -3,12 +3,12 @@ import { useLifeStoryStore } from '@/stores/life-story-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Users, X, ZoomIn, ZoomOut, Maximize2, Network, GitBranchPlus } from 'lucide-react'
+import { ArrowLeft, Users, X, ZoomIn, ZoomOut, Maximize2, Network, GitBranchPlus, List, Plus, Pencil, Trash2, Check } from 'lucide-react'
 import type { Person, LifeEvent } from '@/types'
 import { supabase } from '@/lib/supabase'
 import { FamilyTreeView } from './FamilyTreeView'
 
-type ViewMode = 'network' | 'familyTree'
+type ViewMode = 'network' | 'familyTree' | 'list'
 type FilterMode = 'all' | 'family' | 'friends'
 
 interface RelationshipViewProps {
@@ -130,6 +130,29 @@ const RELATIONSHIP_CONFIG: Record<string, { tier: number; label: string; color: 
 
 const DEFAULT_REL = { tier: 3, label: 'Egyéb', color: 'text-gray-700 dark:text-gray-300', bg: 'bg-gray-100 dark:bg-gray-900/40', border: 'border-gray-400', stroke: '#9ca3af' }
 
+// Relationship labels for list view
+const RELATIONSHIP_LABELS: Record<string, string> = {
+  parent: 'Szülő', mother: 'Anya', father: 'Apa',
+  sibling: 'Testvér', brother: 'Fivér', sister: 'Nővér',
+  child: 'Gyerek', son: 'Fia', daughter: 'Lánya',
+  spouse: 'Házastárs', husband: 'Férj', wife: 'Feleség',
+  partner: 'Partner', friend: 'Barát', colleague: 'Kolléga',
+  teacher: 'Tanár', mentor: 'Mentor', boss: 'Főnök',
+  doctor: 'Orvos', neighbor: 'Szomszéd', acquaintance: 'Ismerős',
+  grandparent: 'Nagyszülő', grandmother: 'Nagyanya', grandfather: 'Nagyapa',
+  grandchild: 'Unoka', uncle: 'Nagybácsi', aunt: 'Nagynéni',
+  cousin: 'Unokatestvér', family: 'Család', relative: 'Rokon',
+  ex_spouse: 'Volt házastárs', ex: 'Volt partner',
+}
+
+function translateLabel(value: string, map: Record<string, string>): string {
+  if (!value) return value
+  const lower = value.toLowerCase().trim()
+  return map[lower] || value
+}
+
+const EMPTY_PERSON: Partial<Person> = { name: '', nickname: null, relationship_type: '', related_period: null, notes: null }
+
 // Keyword-based fallback: ha az exact match nem talál, kulcsszavak alapján dönt
 function getRelConfig(type: string) {
   if (!type) return DEFAULT_REL
@@ -211,9 +234,12 @@ interface ContextMenuState {
 }
 
 export function RelationshipView({ onBack }: RelationshipViewProps) {
-  const { persons, events, loadAll } = useLifeStoryStore()
+  const { persons, events, loadAll, addPerson, updatePerson, deletePerson } = useLifeStoryStore()
   const { profile } = useAuthStore()
   const [viewMode, setViewMode] = useState<ViewMode>('network')
+  const [editingPerson, setEditingPerson] = useState<Partial<Person> | null>(null)
+  const [editingPersonId, setEditingPersonId] = useState<string | null>(null)
+  const [personSaving, setPersonSaving] = useState(false)
   const [filter, setFilter] = useState<FilterMode>('all')
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
   const [hoveredPerson, setHoveredPerson] = useState<Person | null>(null)
@@ -464,6 +490,12 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
           >
             <GitBranchPlus className="w-3.5 h-3.5" /> Családfa
           </button>
+          <button
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${viewMode === 'list' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            onClick={() => setViewMode('list')}
+          >
+            <List className="w-3.5 h-3.5" /> Lista
+          </button>
         </div>
 
         {/* Zoom controls (only for network view) */}
@@ -504,6 +536,152 @@ export function RelationshipView({ onBack }: RelationshipViewProps) {
       {/* Family tree view */}
       {viewMode === 'familyTree' ? (
         <FamilyTreeView selfName={profile?.display_name || 'Én'} />
+      ) : viewMode === 'list' ? (
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="max-w-2xl mx-auto space-y-3">
+            {/* Add new person button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => { setEditingPerson({ ...EMPTY_PERSON }); setEditingPersonId(null) }}
+            >
+              <Plus className="w-3.5 h-3.5 mr-1.5" /> Új személy hozzáadása
+            </Button>
+
+            {/* Inline editor for add/edit */}
+            {editingPerson && (
+              <div className="border-2 border-primary/30 rounded-lg p-3 space-y-2 bg-muted/20">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {editingPersonId ? 'Szerkesztés' : 'Új személy'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    className="col-span-2 text-sm border rounded px-2 py-1.5 bg-background focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="Név *"
+                    value={editingPerson.name || ''}
+                    onChange={e => setEditingPerson({ ...editingPerson, name: e.target.value })}
+                    autoFocus
+                  />
+                  <input
+                    className="text-sm border rounded px-2 py-1.5 bg-background focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="Becenév"
+                    value={editingPerson.nickname || ''}
+                    onChange={e => setEditingPerson({ ...editingPerson, nickname: e.target.value || null })}
+                  />
+                  <input
+                    className="text-sm border rounded px-2 py-1.5 bg-background focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="Kapcsolat (pl. anya, barát)"
+                    value={editingPerson.relationship_type || ''}
+                    onChange={e => setEditingPerson({ ...editingPerson, relationship_type: e.target.value })}
+                  />
+                  <input
+                    className="text-sm border rounded px-2 py-1.5 bg-background focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="Időszak (pl. 2000-2010)"
+                    value={editingPerson.related_period || ''}
+                    onChange={e => setEditingPerson({ ...editingPerson, related_period: e.target.value || null })}
+                  />
+                  <input
+                    className="text-sm border rounded px-2 py-1.5 bg-background focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="Jegyzetek"
+                    value={editingPerson.notes || ''}
+                    onChange={e => setEditingPerson({ ...editingPerson, notes: e.target.value || null })}
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setEditingPerson(null); setEditingPersonId(null) }}
+                    disabled={personSaving}
+                  >
+                    <X className="w-3.5 h-3.5 mr-1" /> Mégse
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!editingPerson.name?.trim() || !editingPerson.relationship_type?.trim() || personSaving}
+                    onClick={async () => {
+                      if (!editingPerson.name?.trim() || !editingPerson.relationship_type?.trim()) return
+                      setPersonSaving(true)
+                      try {
+                        if (editingPersonId) {
+                          await updatePerson(editingPersonId, editingPerson)
+                        } else {
+                          await addPerson(editingPerson)
+                        }
+                        setEditingPerson(null)
+                        setEditingPersonId(null)
+                      } catch (err) {
+                        console.error('Person save error:', err)
+                      } finally {
+                        setPersonSaving(false)
+                      }
+                    }}
+                  >
+                    <Check className="w-3.5 h-3.5 mr-1" /> {personSaving ? 'Mentés...' : 'Mentés'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {persons.length === 0 && !editingPerson ? (
+              <p className="text-center py-12 text-muted-foreground">Még nem szerepelnek személyek az életutadban.</p>
+            ) : persons.map(person => (
+              <div key={person.id} className="border rounded-lg p-3 group">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-sm">{person.name}</span>
+                      {person.nickname && <span className="text-xs text-muted-foreground">({person.nickname})</span>}
+                      <Badge variant="secondary" className="text-xs">{translateLabel(person.relationship_type, RELATIONSHIP_LABELS)}</Badge>
+                    </div>
+                    {person.related_period && <p className="text-xs text-muted-foreground">{person.related_period}</p>}
+                    {person.notes && <p className="text-xs mt-1">{person.notes}</p>}
+                  </div>
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      title="Szerkesztés"
+                      onClick={() => {
+                        setEditingPerson({
+                          name: person.name,
+                          nickname: person.nickname,
+                          relationship_type: person.relationship_type,
+                          related_period: person.related_period,
+                          notes: person.notes,
+                        })
+                        setEditingPersonId(person.id)
+                      }}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 hover:text-destructive"
+                      title="Törlés"
+                      onClick={async () => {
+                        if (confirm(`Biztosan törölni szeretnéd "${person.name}" személyt? A családfából és minden kapcsolatból is törlődik.`)) {
+                          try {
+                            await deletePerson(person.id)
+                          } catch (err) {
+                            console.error('Delete person error:', err)
+                          }
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
         <>
 

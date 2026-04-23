@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthStore } from '@/stores/auth-store'
-import { BookOpen, Settings, LogOut, Menu, FileText, Clock, MapPin, Users, UserPlus, Eye, ChevronDown, MessageSquare, X } from 'lucide-react'
+import { BookOpen, Settings, LogOut, Menu, FileText, Clock, MapPin, Users, UserPlus, Eye, ChevronDown, MessageSquare, X, AlertCircle } from 'lucide-react'
 import type { LifeStoryShare } from '@/types'
 
 interface HeaderProps {
@@ -21,13 +21,14 @@ interface HeaderProps {
   pendingContribCount?: number
   pendingReceivedInvites?: number
   incomingShares?: LifeStoryShare[]
+  hasNewShares?: boolean
 }
 
 export function Header({
   onToggleSidebar, onGoHome, onShowLifeStory, onShowTimeline, onShowMap,
   onShowRelationships, onShowSettings, onShowInvitations, onShowShared,
   aiStatus, storageStatus, pendingContribCount = 0, pendingReceivedInvites = 0,
-  incomingShares = [],
+  incomingShares = [], hasNewShares = false,
 }: HeaderProps) {
   const { profile, signOut } = useAuthStore()
   const [sharesOpen, setSharesOpen] = useState(false)
@@ -176,6 +177,7 @@ export function Header({
                 >
                   <Eye className="w-4 h-4" />
                   <span className="hidden sm:inline">Mások élete</span>
+                  {hasNewShares && <AlertCircle className="w-3.5 h-3.5 text-amber-500" />}
                   <ChevronDown className="w-3 h-3" />
                 </Button>
               </TooltipTrigger>

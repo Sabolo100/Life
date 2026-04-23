@@ -20,7 +20,8 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { HelpCircle } from 'lucide-react'
+import { HelpCircle, Eye } from 'lucide-react'
+import { useAuthStore } from '@/stores/auth-store'
 import type { LifeStoryShare } from '@/types'
 
 type View = 'chat' | 'lifeStory' | 'timeline' | 'map' | 'relationships' | 'settings' | 'invitations' | 'sharedStory'
@@ -33,7 +34,9 @@ export function MainPage() {
   const [aiStatus, setAiStatus] = useState<'ok' | 'unknown' | 'error'>('unknown')
   const [storageStatus] = useState<'ok' | 'error'>('ok')
   const { aiModel } = useSettingsStore()
+  const { user } = useAuthStore()
   const [selectedShare, setSelectedShare] = useState<LifeStoryShare | null>(null)
+  const [showSharesPopup, setShowSharesPopup] = useState(false)
   const sessionInitialized = useRef(false)
 
   const { loadSessions, sessions, loading, createSession, currentSession } = useChatStore()
@@ -42,6 +45,23 @@ export function MainPage() {
     loadInvitations, loadIncomingShares, loadContributions, loadReceivedInvitations,
     pendingContributions, incomingShares, receivedInvitations,
   } = useInvitationStore()
+
+  // Show popup once per user when they have incoming shares they haven't seen
+  useEffect(() => {
+    if (!user || incomingShares.length === 0) return
+    const key = `seen_shares_${user.id}`
+    const seenCount = parseInt(localStorage.getItem(key) || '0')
+    if (incomingShares.length > seenCount) {
+      setShowSharesPopup(true)
+    }
+  }, [user, incomingShares])
+
+  const dismissSharesPopup = () => {
+    setShowSharesPopup(false)
+    if (user) {
+      localStorage.setItem(`seen_shares_${user.id}`, String(incomingShares.length))
+    }
+  }
 
   // Auto-test AI on mount
   useEffect(() => {
@@ -95,6 +115,37 @@ export function MainPage() {
 
   return (
     <div className="h-screen flex flex-col relative">
+      {showSharesPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-background rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <Eye className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-semibold text-lg">Meghívót kaptál!</h3>
+              <p className="text-muted-foreground text-sm mt-1">
+                {incomingShares.length === 1
+                  ? `${incomingShares[0].owner_name || 'Valaki'} megosztotta veled az emlékkönyvét.`
+                  : `${incomingShares.length} személy osztotta meg veled az emlékkönyvét.`}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button
+                className="w-full"
+                onClick={() => {
+                  dismissSharesPopup()
+                  handleShowShared(incomingShares[0])
+                }}
+              >
+                <Eye className="w-4 h-4 mr-2" /> Megnézem
+              </Button>
+              <Button variant="outline" className="w-full" onClick={dismissSharesPopup}>
+                Később
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <MosaicBackground opacity={0.3} />
       <Header
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
@@ -111,6 +162,7 @@ export function MainPage() {
         pendingContribCount={pendingContribCount}
         pendingReceivedInvites={pendingReceivedInvites}
         incomingShares={incomingShares}
+        hasNewShares={showSharesPopup}
       />
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}

@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, MapPin, Search, Loader2, Check, X, Navigation, ChevronDown, ChevronUp, Edit2, Trash2 } from 'lucide-react'
+import { ArrowLeft, MapPin, Search, Loader2, Check, X, Navigation, ChevronDown, ChevronUp, Edit2, Trash2, List, Map } from 'lucide-react'
 import type { Location } from '@/types'
 
 // Fix Leaflet default icon issue with bundlers
@@ -89,12 +89,25 @@ function FitBounds({ locations }: { locations: Location[] }) {
   return null
 }
 
+// ── Location type labels ───────────────────────────────────────────────────
+
+const LOCATION_TYPE_LABELS: Record<string, string> = {
+  residence: 'Lakóhely', home: 'Otthon', school: 'Iskola',
+  workplace: 'Munkahely', hospital: 'Kórház', church: 'Templom',
+  city: 'Város', town: 'Város', village: 'Falu',
+  country: 'Ország', region: 'Régió', park: 'Park',
+  office: 'Iroda', university: 'Egyetem', other: 'Egyéb',
+  birth_place: 'Születési hely', vacation: 'Nyaralóhely',
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 interface MapViewProps { onBack: () => void }
 
 export function MapView({ onBack }: MapViewProps) {
   const { locations, geocodeLocation, confirmLocation, updateLocationCoordinates, deleteLocation } = useLifeStoryStore()
+
+  const [viewMode, setViewMode] = useState<'map' | 'list'>('map')
 
   // Selected location panel
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -215,6 +228,14 @@ export function MapView({ onBack }: MapViewProps) {
             </Badge>
           )}
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs gap-1 ml-auto"
+          onClick={() => setViewMode(viewMode === 'map' ? 'list' : 'map')}
+        >
+          {viewMode === 'map' ? <><List className="w-3.5 h-3.5" /> Lista</> : <><Map className="w-3.5 h-3.5" /> Térkép</>}
+        </Button>
       </div>
 
       {locations.length === 0 ? (
@@ -223,6 +244,26 @@ export function MapView({ onBack }: MapViewProps) {
             <MapPin className="w-12 h-12 mx-auto mb-4 opacity-40" />
             <p className="text-lg font-medium mb-2">A térképed még üres</p>
             <p className="text-sm">Mesélj az AI-nak és a helyszínek automatikusan megjelennek!</p>
+          </div>
+        </div>
+      ) : viewMode === 'list' ? (
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="max-w-2xl mx-auto space-y-2">
+            {locations.length === 0 ? (
+              <p className="text-center py-20 text-muted-foreground text-sm">Még nincsenek helyszínek.</p>
+            ) : locations.map(loc => (
+              <div key={loc.id} className="border rounded-lg p-3 flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-sm">{loc.name}</p>
+                  <div className="flex gap-2 mt-1">
+                    {loc.type && <Badge variant="secondary" className="text-xs">{LOCATION_TYPE_LABELS[loc.type] || loc.type}</Badge>}
+                    {loc.related_period && <span className="text-xs text-muted-foreground">{loc.related_period}</span>}
+                    {loc.coordinates_confirmed && <Badge variant="outline" className="text-xs text-green-600">✓ Koordináta</Badge>}
+                  </div>
+                  {loc.notes && <p className="text-xs text-muted-foreground mt-1">{loc.notes}</p>}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ) : (

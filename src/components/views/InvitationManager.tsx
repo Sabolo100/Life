@@ -86,6 +86,7 @@ export function InvitationManager({ onBack }: InvitationManagerProps) {
   const [acceptingToken, setAcceptingToken] = useState<string | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   const [createLoading, setCreateLoading] = useState(false)
+  const [createSuccess, setCreateSuccess] = useState(false)
 
   useEffect(() => {
     loadInvitations()
@@ -134,10 +135,14 @@ export function InvitationManager({ onBack }: InvitationManagerProps) {
       if (inv) {
         setCreating(false)
         setCreateError(null)
+        setCreateSuccess(true)
         setInvitedName('')
         setInvitedEmail('')
         setPermission('reader')
         setExpiresInDays(null)
+        // Refresh list from DB to ensure UI is in sync
+        loadInvitations() // fire and forget — don't block UI
+        setTimeout(() => setCreateSuccess(false), 3000)
       } else {
         setCreateError('Nem sikerült létrehozni a meghívót (nincs adat és nincs hibaüzenet).')
       }
@@ -255,6 +260,14 @@ export function InvitationManager({ onBack }: InvitationManagerProps) {
         {/* ── INVITE TAB ────────────────────────────────────────── */}
         {tab === 'invite' && (
           <div className="space-y-4">
+            {/* Success message */}
+            {createSuccess && (
+              <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 flex items-center gap-2">
+                <Check className="w-4 h-4 shrink-0" />
+                Meghívó létrehozva! Másold ki a linket és küldd el.
+              </div>
+            )}
+
             {/* Create new invitation */}
             {!creating ? (
               <Button onClick={() => setCreating(true)} className="w-full gap-2">

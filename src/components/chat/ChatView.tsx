@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { SuggestionChips } from './SuggestionChips'
-import { BookOpen } from 'lucide-react'
+import { BookOpen, ArrowDown } from 'lucide-react'
 import { sendChatMessage } from '@/lib/ai-service'
 import { supabase } from '@/lib/supabase'
 import { speakText } from '@/lib/tts-service'
@@ -159,11 +159,17 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
               <BookOpen className="w-8 h-8 text-primary" />
             </div>
             <h2 className="text-xl font-semibold mb-2">Üdvözöllek!</h2>
-            <p className="text-muted-foreground max-w-md">
+            <p className="text-muted-foreground max-w-md mb-4">
               Én vagyok az Emlékkönyv asszisztensed. Segítek felépíteni az élettörténetedet.
               Kérdezek, hallgatok, és közben szépen összeállítom a te egyedi emlékkönyvedet.
-              Meséld el, honnan szeretnéd kezdeni!
             </p>
+            <p className="text-muted-foreground max-w-md mb-6 font-medium">
+              Hogyan szólíthatlak?
+            </p>
+            <div className="flex items-center gap-2 text-muted-foreground/60 text-sm animate-bounce">
+              <ArrowDown className="w-4 h-4" />
+              <span>Írj az alábbi mezőbe</span>
+            </div>
           </div>
         )}
         <div className="space-y-4 max-w-3xl mx-auto">
