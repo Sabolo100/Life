@@ -57,22 +57,22 @@ export function Header({
   const totalAlerts = pendingContribCount + pendingReceivedInvites
 
   return (
-    <header className="h-14 border-b border-amber-200/50 flex items-center px-4 gap-1 bg-[#f8f4ee]/90 backdrop-blur sticky top-0 z-50">
-      {/* LEFT side */}
-      <div className="flex items-center gap-1">
-        {/* Logo — acts as home button */}
-        <button
-          onClick={onGoHome}
-          className="flex items-center gap-2 hover:opacity-80 transition-opacity mr-1"
-        >
-          <BookOpen className="w-5 h-5 text-primary" />
-          <span className="font-semibold text-sm">Emlékkönyv</span>
-        </button>
+    <header className="h-14 border-b border-amber-200/50 flex items-center px-3 gap-1 bg-[#f8f4ee]/90 backdrop-blur sticky top-0 z-50 shrink-0">
+      {/* Logo — always visible, never scrolls away */}
+      <button
+        onClick={onGoHome}
+        className="flex items-center gap-1.5 hover:opacity-80 transition-opacity shrink-0 mr-1"
+      >
+        <BookOpen className="w-5 h-5 text-primary" />
+        <span className="font-semibold text-sm hidden xs:inline">Emlékkönyv</span>
+      </button>
 
+      {/* Nav icons — horizontally scrollable on mobile so right side is always reachable */}
+      <div className="flex items-center gap-0.5 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] min-w-0 flex-1">
         {/* Chat icon */}
         <Tooltip>
           <TooltipTrigger>
-            <Button variant="ghost" size="icon" onClick={onToggleSidebar}>
+            <Button variant="ghost" size="icon" onClick={onToggleSidebar} className="shrink-0">
               <MessageSquare className="w-4 h-4" />
             </Button>
           </TooltipTrigger>
@@ -82,7 +82,7 @@ export function Header({
         {/* Life story icon */}
         <Tooltip>
           <TooltipTrigger>
-            <Button variant="ghost" size="icon" onClick={onShowLifeStory}>
+            <Button variant="ghost" size="icon" onClick={onShowLifeStory} className="shrink-0">
               <FileText className="w-4 h-4" />
             </Button>
           </TooltipTrigger>
@@ -92,7 +92,7 @@ export function Header({
         {/* Timeline icon */}
         <Tooltip>
           <TooltipTrigger>
-            <Button variant="ghost" size="icon" onClick={onShowTimeline}>
+            <Button variant="ghost" size="icon" onClick={onShowTimeline} className="shrink-0">
               <Clock className="w-4 h-4" />
             </Button>
           </TooltipTrigger>
@@ -102,7 +102,7 @@ export function Header({
         {/* Map icon */}
         <Tooltip>
           <TooltipTrigger>
-            <Button variant="ghost" size="icon" onClick={onShowMap}>
+            <Button variant="ghost" size="icon" onClick={onShowMap} className="shrink-0">
               <MapPin className="w-4 h-4" />
             </Button>
           </TooltipTrigger>
@@ -112,7 +112,7 @@ export function Header({
         {/* Relationships icon */}
         <Tooltip>
           <TooltipTrigger>
-            <Button variant="ghost" size="icon" onClick={onShowRelationships}>
+            <Button variant="ghost" size="icon" onClick={onShowRelationships} className="shrink-0">
               <Users className="w-4 h-4" />
             </Button>
           </TooltipTrigger>
@@ -121,7 +121,7 @@ export function Header({
 
         {/* "Mások élete" — dropdown for shared stories */}
         {incomingShares.length > 0 && (
-          <div className="relative" ref={sharesRef}>
+          <div className="relative shrink-0" ref={sharesRef}>
             <Tooltip>
               <TooltipTrigger>
                 <Button
@@ -131,7 +131,7 @@ export function Header({
                   onClick={() => setSharesOpen(!sharesOpen)}
                 >
                   <Eye className="w-4 h-4" />
-                  <span>Mások élete</span>
+                  <span className="hidden sm:inline">Mások élete</span>
                   {hasNewShares && <AlertCircle className="w-3.5 h-3.5 text-amber-500" />}
                   <ChevronDown className="w-3 h-3" />
                 </Button>
@@ -167,8 +167,8 @@ export function Header({
         )}
       </div>
 
-      {/* RIGHT side */}
-      <div className="flex items-center gap-1 ml-auto">
+      {/* RIGHT side — always visible, never pushed off-screen */}
+      <div className="flex items-center gap-0.5 shrink-0">
         {/* Invitations with badge */}
         <Tooltip>
           <TooltipTrigger>

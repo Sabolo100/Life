@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useChatStore } from '@/stores/chat-store'
 import { useLifeStoryStore } from '@/stores/life-story-store'
 import { useSettingsStore } from '@/stores/settings-store'
@@ -24,6 +24,7 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
   const { profile } = useAuthStore()
   const scrollRef = useRef<HTMLDivElement>(null)
   const suggestionsRef = useRef<string[]>([])
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false)
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -137,6 +138,8 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
       }
 
       suggestionsRef.current = response.suggestions || []
+      // Collapse suggestions for each new AI response — user opens them manually
+      setSuggestionsOpen(false)
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Ismeretlen hiba'
       console.error('[ChatView] AI error:', errorMsg)
@@ -193,7 +196,12 @@ export function ChatView({ onShowLifeStory: _onShowLifeStory, pendingQuestion, o
         </div>
       </div>
       {topicHints && suggestionsRef.current.length > 0 && !sending && (
-        <SuggestionChips suggestions={suggestionsRef.current} onSelect={handleSuggestionClick} />
+        <SuggestionChips
+          suggestions={suggestionsRef.current}
+          onSelect={handleSuggestionClick}
+          open={suggestionsOpen}
+          onToggle={() => setSuggestionsOpen(o => !o)}
+        />
       )}
       <ChatInput onSend={handleSend} disabled={sending} pendingMessage={pendingQuestion} onPendingConsumed={onPendingConsumed} />
     </div>

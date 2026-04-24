@@ -114,7 +114,7 @@ export function MainPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col relative">
+    <div className="h-[100dvh] flex flex-col relative">
       {showSharesPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-background rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
@@ -164,7 +164,7 @@ export function MainPage() {
         incomingShares={incomingShares}
         hasNewShares={showSharesPopup}
       />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Desktop sidebar */}
         {currentView === 'chat' && (
           <div className="hidden md:flex md:flex-col w-64 border-r bg-[#f8f4ee]/80 backdrop-blur-sm relative z-10">

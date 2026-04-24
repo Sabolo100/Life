@@ -252,6 +252,7 @@ export function RelationshipView({ onBack: _onBack }: RelationshipViewProps) {
   const isPanning = useRef(false)
   const panStart = useRef({ mouseX: 0, mouseY: 0, panX: 0, panY: 0 })
   const svgRef = useRef<SVGSVGElement>(null)
+  const lastTouchRef = useRef<{ x: number; y: number } | null>(null)
 
   // Close context menu on outside click
   useEffect(() => {
@@ -312,6 +313,27 @@ export function RelationshipView({ onBack: _onBack }: RelationshipViewProps) {
   }
 
   const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }) }
+
+  const handleTouchStart = (e: React.TouchEvent<SVGSVGElement>) => {
+    if (e.touches.length === 1) {
+      lastTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      panStart.current = { mouseX: e.touches[0].clientX, mouseY: e.touches[0].clientY, panX: pan.x, panY: pan.y }
+      isPanning.current = true
+    }
+  }
+  const handleTouchMove = (e: React.TouchEvent<SVGSVGElement>) => {
+    if (!isPanning.current || e.touches.length !== 1) return
+    e.preventDefault()
+    const rect = svgRef.current!.getBoundingClientRect()
+    const svgScale = 100 / zoom / rect.width
+    const dx = (e.touches[0].clientX - panStart.current.mouseX) * svgScale
+    const dy = (e.touches[0].clientY - panStart.current.mouseY) * svgScale
+    setPan({ x: panStart.current.panX - dx, y: panStart.current.panY - dy })
+  }
+  const handleTouchEnd = () => {
+    isPanning.current = false
+    lastTouchRef.current = null
+  }
 
   // Move person to target tier: update DB relationship_type
   const movePerson = async (person: Person, targetTier: number) => {
@@ -433,16 +455,6 @@ export function RelationshipView({ onBack: _onBack }: RelationshipViewProps) {
     return result
   }, [filteredPersons, tierOverrides])
 
-  // Group persons by tier for list view
-  const groupedPersons = useMemo(() => {
-    const groups: Record<number, Person[]> = { 1: [], 2: [], 3: [] }
-    filteredPersons.forEach(p => {
-      const tier = tierOverrides[p.id] ?? getRelConfig(p.relationship_type).tier
-      groups[tier].push(p)
-    })
-    return groups
-  }, [filteredPersons, tierOverrides])
-
   if (persons.length === 0) {
     return (
       <div className="h-full flex flex-col">
@@ -468,12 +480,40 @@ export function RelationshipView({ onBack: _onBack }: RelationshipViewProps) {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
-        <Badge variant="secondary" className="text-xs">{persons.length}</Badge>
+      {/* Header: filter group + view group in one row */}
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b shrink-0 flex-wrap">
+        <Badge variant="secondary" className="text-xs shrink-0">{persons.length}</Badge>
 
-        {/* View mode tabs */}
-        <div className="flex items-center gap-0.5 ml-auto bg-muted rounded-lg p-0.5">
+        {/* Filter group */}
+        <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
+          {(['all', 'Mindenki'] as const)[0] && (
+            [['all', 'Mindenki'], ['family', 'Család'], ['friends', 'Barátok']] as [FilterMode, string][]
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                filter === key
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Visual separator */}
+        <div className="h-4 w-px bg-border shrink-0" />
+
+        {/* View group */}
+        <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
+          <button
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${viewMode === 'list' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            onClick={() => setViewMode('list')}
+          >
+            <List className="w-3.5 h-3.5" /> Lista
+          </button>
           <button
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${viewMode === 'network' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             onClick={() => setViewMode('network')}
@@ -482,52 +522,12 @@ export function RelationshipView({ onBack: _onBack }: RelationshipViewProps) {
           </button>
           <button
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${viewMode === 'familyTree' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-            onClick={() => setViewMode('familyTree')}
+            onClick={() => { setViewMode('familyTree'); setFilter('family') }}
           >
             <GitBranchPlus className="w-3.5 h-3.5" /> Családfa
           </button>
-          <button
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${viewMode === 'list' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-            onClick={() => setViewMode('list')}
-          >
-            <List className="w-3.5 h-3.5" /> Lista
-          </button>
         </div>
-
-        {/* Zoom controls (only for network view) */}
-        {viewMode === 'network' && (
-          <div className="flex items-center gap-1 ml-2">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
-              const newZoom = Math.min(5, zoom * 1.3)
-              setZoom(newZoom)
-            }}><ZoomIn className="w-3.5 h-3.5" /></Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
-              const newZoom = Math.max(1, zoom / 1.3)
-              setZoom(newZoom)
-              if (newZoom <= 1) setPan({ x: 0, y: 0 })
-            }}><ZoomOut className="w-3.5 h-3.5" /></Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetView}><Maximize2 className="w-3.5 h-3.5" /></Button>
-          </div>
-        )}
       </div>
-
-      {/* Filter pills - only for network view */}
-      {viewMode === 'network' && (
-        <div className="flex items-center gap-1.5 px-4 py-2 border-b shrink-0">
-          {([['all', 'Mind'], ['family', 'Család'], ['friends', 'Barátok']] as const).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${filter === key
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Family tree view */}
       {viewMode === 'familyTree' ? (
@@ -622,9 +622,9 @@ export function RelationshipView({ onBack: _onBack }: RelationshipViewProps) {
               </div>
             )}
 
-            {persons.length === 0 && !editingPerson ? (
+            {filteredPersons.length === 0 && !editingPerson ? (
               <p className="text-center py-12 text-muted-foreground">Még nem szerepelnek személyek az életutadban.</p>
-            ) : persons.map(person => (
+            ) : filteredPersons.map(person => (
               <div key={person.id} className="border rounded-lg p-3 group">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -681,18 +681,21 @@ export function RelationshipView({ onBack: _onBack }: RelationshipViewProps) {
       ) : (
         <>
 
-      {/* Radial layout - hidden on mobile */}
-      <div className="flex-1 overflow-hidden relative hidden md:block">
+      {/* Radial layout */}
+      <div className="flex-1 overflow-hidden relative block">
         <svg
           ref={svgRef}
           className="w-full h-full"
           viewBox={`${vbX} ${vbY} ${vbSize} ${vbSize}`}
           preserveAspectRatio="xMidYMid meet"
-          style={{ cursor: 'grab', userSelect: 'none' }}
+          style={{ cursor: isPanning.current ? 'grabbing' : 'grab', userSelect: 'none', touchAction: 'none' }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           {/* Concentric circle guides */}
           <circle cx="50" cy="50" r="22" fill="none" stroke="currentColor" className="text-border" strokeWidth="0.15" strokeDasharray="1 0.5" />
@@ -776,6 +779,21 @@ export function RelationshipView({ onBack: _onBack }: RelationshipViewProps) {
           <text x="50" y="14" textAnchor="middle" fontSize="1.2" className="fill-muted-foreground" opacity="0.5">{TIER_LABELS[2]}</text>
           <text x="50" y="2.5" textAnchor="middle" fontSize="1.2" className="fill-muted-foreground" opacity="0.5">{TIER_LABELS[3]}</text>
         </svg>
+
+        {/* Zoom controls — fixed overlay, doesn't affect layout */}
+        {viewMode === 'network' && (
+          <div className="absolute top-2 right-2 flex items-center gap-0.5 bg-background/80 backdrop-blur rounded-lg p-0.5 z-10 border border-border/50">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom(z => Math.min(5, z * 1.3))} title="Nagyítás">
+              <ZoomIn className="w-3.5 h-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { const z = Math.max(1, zoom / 1.3); setZoom(z); if (z <= 1) setPan({ x: 0, y: 0 }) }} title="Kicsinyítés">
+              <ZoomOut className="w-3.5 h-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetView} title="Visszaállítás">
+              <Maximize2 className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        )}
 
         {/* Context menu (right-click) */}
         {contextMenu && (
@@ -889,78 +907,6 @@ export function RelationshipView({ onBack: _onBack }: RelationshipViewProps) {
         )}
       </div>
 
-      {/* Mobile list view */}
-      <div className="flex-1 overflow-y-auto md:hidden p-4 space-y-6">
-        {[1, 2, 3].map(tier => {
-          const tierPersons = groupedPersons[tier]
-          if (tierPersons.length === 0) return null
-          return (
-            <div key={tier}>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">{TIER_LABELS[tier]}</h3>
-              <div className="space-y-2">
-                {tierPersons.map(person => {
-                  const cfg = getRelConfig(person.relationship_type)
-                  const isSelected = selectedPerson?.id === person.id
-                  const linked = getLinkedEvents(person)
-                  return (
-                    <div key={person.id}
-                      className={`border rounded-lg p-3 cursor-pointer transition-colors ${isSelected ? 'ring-2 ring-primary' : 'hover:bg-muted/50'}`}
-                      onClick={() => setSelectedPerson(isSelected ? null : person)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: cfg.stroke }}>
-                          {person.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm truncate">{person.name}</span>
-                            {person.nickname && <span className="text-xs text-muted-foreground truncate">({person.nickname})</span>}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className={`${cfg.bg} ${cfg.color} border-0 text-[10px] px-1.5 py-0`}>{cfg.label}</Badge>
-                            {person.related_period && <span className="text-[10px] text-muted-foreground">{person.related_period}</span>}
-                          </div>
-                        </div>
-                      </div>
-                      {isSelected && (
-                        <div className="mt-3 pt-3 border-t space-y-2 text-sm">
-                          {person.notes && (
-                            <div>
-                              <span className="text-muted-foreground text-xs block mb-0.5">Jegyzetek:</span>
-                              <p className="text-xs bg-muted/50 rounded p-2">{person.notes}</p>
-                            </div>
-                          )}
-                          {linked.length > 0 && (
-                            <div>
-                              <span className="text-muted-foreground text-xs block mb-1">Kapcsolodo esemenyek:</span>
-                              <div className="space-y-1">
-                                {linked.map(ev => <div key={ev.id} className="text-xs bg-muted/50 rounded px-2 py-1">{ev.title}</div>)}
-                              </div>
-                            </div>
-                          )}
-                          {/* Mobile tier move */}
-                          <div className="pt-1 border-t">
-                            <span className="text-muted-foreground text-xs block mb-1">Áthelyezés:</span>
-                            <div className="flex gap-1.5">
-                              {[1, 2, 3].map(t => (
-                                <button key={t} disabled={tier === t}
-                                  onClick={e => { e.stopPropagation(); movePerson(person, t) }}
-                                  className={`text-xs px-2 py-1 rounded border disabled:opacity-40 ${t === 1 ? 'border-rose-400 text-rose-600' : t === 2 ? 'border-blue-400 text-blue-600' : 'border-amber-400 text-amber-600'}`}>
-                                  {TIER_LABELS[t]}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
       </>
       )}
     </div>
