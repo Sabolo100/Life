@@ -6,7 +6,8 @@ import { useAuthStore } from '@/stores/auth-store'
 import { gdriveAdapter, fsAdapter, isFileSystemAccessSupported } from '@/lib/storage'
 import {
   BookOpen, MessageSquare, Shield, Pencil, Download,
-  ArrowRight, Cloud, HardDrive, FolderOpen, Loader2,
+  ArrowRight, Cloud, FolderOpen, Loader2, CheckCircle2,
+  Users, AlertTriangle, Monitor, Smartphone, Globe,
 } from 'lucide-react'
 import type { StoragePreference } from '@/types'
 
@@ -38,40 +39,31 @@ const steps = [
   },
 ]
 
-const STORAGE_STEP_INDEX = steps.length // 5 → the 6th step
-
+const STORAGE_STEP_INDEX = steps.length
 type StorageChoice = StoragePreference | null
-type SubChoice = 'gdrive' | 'fs_local' | null
 
 export function OnboardingPage() {
   const [step, setStep] = useState(0)
   const { updateProfile } = useAuthStore()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Top-level: cloud / own-database / null
-  const [topChoice, setTopChoice] = useState<'cloud' | 'own' | null>('cloud')
-  // Sub-choice (only when topChoice === 'own'): gdrive / fs_local
-  const [subChoice, setSubChoice] = useState<SubChoice>(null)
+  const [choice, setChoice] = useState<StorageChoice>('cloud')
   const [connecting, setConnecting] = useState(false)
-  const [connectedFor, setConnectedFor] = useState<SubChoice>(null)
+  const [connectedFor, setConnectedFor] = useState<StorageChoice>(null)
 
   const fsSupported = isFileSystemAccessSupported()
-
   const isStorageStep = step === STORAGE_STEP_INDEX
   const totalSteps = steps.length + 1
 
   const handleNext = () => {
-    if (step < totalSteps - 1) {
-      setStep(step + 1)
-    }
+    if (step < totalSteps - 1) setStep(step + 1)
   }
 
-  const finalChoice: StorageChoice =
-    topChoice === 'cloud' ? 'cloud'
-    : topChoice === 'own' && connectedFor ? connectedFor
-    : null
-
-  const canFinish = finalChoice !== null && !connecting
+  // "cloud" doesn't need a connect step — always ready
+  const canFinish =
+    choice === 'cloud'
+      ? true
+      : choice !== null && connectedFor === choice && !connecting
 
   // ── Connect handlers ──────────────────────────────────────────────
 
@@ -80,7 +72,6 @@ export function OnboardingPage() {
     setConnecting(true)
     try {
       await gdriveAdapter.connectAndCreateFolder()
-      setSubChoice('gdrive')
       setConnectedFor('gdrive')
     } catch (err) {
       setError((err as Error).message || 'Google Drive csatlakozás sikertelen.')
@@ -94,10 +85,8 @@ export function OnboardingPage() {
     setConnecting(true)
     try {
       await fsAdapter.connectAndPickFolder()
-      setSubChoice('fs_local')
       setConnectedFor('fs_local')
     } catch (err) {
-      // User cancellation throws AbortError — silent.
       const e = err as Error
       if (e.name !== 'AbortError') {
         setError(e.message || 'Mappa kiválasztása sikertelen.')
@@ -108,10 +97,10 @@ export function OnboardingPage() {
   }
 
   const handleFinish = async () => {
-    if (!finalChoice) return
+    if (!choice) return
     setSaving(true)
     await updateProfile({
-      storage_preference: finalChoice,
+      storage_preference: choice,
       onboarding_completed: true,
       privacy_accepted_at: new Date().toISOString(),
     })
@@ -150,139 +139,125 @@ export function OnboardingPage() {
           </>
         ) : (
           <>
-            <CardHeader className="text-center">
+            <CardHeader className="text-center pb-3">
               <CardTitle className="text-xl">Hol tároljuk az életutadat?</CardTitle>
-              <p className="text-sm text-muted-foreground mt-2">
-                Ezt később NEM tudod módosítani, válassz figyelmesen.
+              <p className="text-sm text-muted-foreground mt-1">
+                Ezt később nem tudod módosítani — válassz figyelmesen.
               </p>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3 mb-6">
-                {/* Cloud option */}
-                <button
-                  type="button"
-                  onClick={() => { setTopChoice('cloud'); setSubChoice(null); setConnectedFor(null); setError(null) }}
-                  className={`w-full text-left rounded-xl border-2 p-4 transition-colors ${
-                    topChoice === 'cloud'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border bg-background hover:border-primary/50'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      topChoice === 'cloud' ? 'bg-primary/15' : 'bg-muted'
-                    }`}>
-                      <Cloud className={`w-5 h-5 ${topChoice === 'cloud' ? 'text-primary' : 'text-muted-foreground'}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium">Felhő (ajánlott)</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Biztonságos, automatikus backup. Bárhonnan elérheted, megoszthatod másokkal, együttműködhetsz családdal, barátokkal.
-                      </p>
-                    </div>
-                  </div>
-                </button>
+              <div className="space-y-3 mb-5">
 
-                {/* Own database option */}
-                <button
-                  type="button"
-                  onClick={() => { setTopChoice('own'); setError(null) }}
-                  className={`w-full text-left rounded-xl border-2 p-4 transition-colors ${
-                    topChoice === 'own'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border bg-background hover:border-primary/50'
-                  }`}
+                {/* ── 1. Emlékkönyv felhő ── */}
+                <StorageCard
+                  selected={choice === 'cloud'}
+                  onClick={() => { setChoice('cloud'); setError(null) }}
+                  icon={<Cloud className="w-5 h-5 text-primary" />}
+                  iconBg={choice === 'cloud' ? 'bg-primary/15' : 'bg-muted'}
+                  badge="Ajánlott"
+                  badgeColor="bg-primary/10 text-primary"
+                  title="Emlékkönyv felhő"
+                  description="Biztonságos, titkosított tárolás a mi szerverünkön. Automatikus mentés, minden eszközödről elérhető."
                 >
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      topChoice === 'own' ? 'bg-primary/15' : 'bg-muted'
-                    }`}>
-                      <HardDrive className={`w-5 h-5 ${topChoice === 'own' ? 'text-primary' : 'text-muted-foreground'}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium">Saját adatbázis</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Te választod a tárolás helyét — Google Drive-od vagy a saját géped. Mi sosem látjuk az adatokat. Megosztás és együttműködés ebben a módban nem elérhető.
-                      </p>
-                    </div>
+                  <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <FeatureRow icon={<CheckCircle2 className="w-3 h-3 text-green-600" />} label="Minden eszközön működik" />
+                    <FeatureRow icon={<CheckCircle2 className="w-3 h-3 text-green-600" />} label="Automatikus backup" />
+                    <FeatureRow icon={<Users className="w-3 h-3 text-green-600" />} label="Megosztás, együttműködés" />
+                    <FeatureRow icon={<CheckCircle2 className="w-3 h-3 text-green-600" />} label="Adatvesztés kockázata: nincs" />
                   </div>
-                </button>
+                </StorageCard>
 
-                {/* Sub-choice when "own" is selected */}
-                {topChoice === 'own' && (
-                  <div className="ml-4 pl-4 border-l-2 border-primary/30 space-y-2">
-                    {/* Google Drive */}
-                    <div className={`rounded-lg border p-3 ${
-                      connectedFor === 'gdrive' ? 'border-green-500 bg-green-50' : 'border-border bg-background'
-                    }`}>
-                      <div className="flex items-start gap-3">
-                        <Cloud className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">Google Drive mappa</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            A saját Drive-odon létrehozunk egy <strong>Emlékkönyv</strong> mappát. Cross-device, mobil + desktop.
-                          </p>
-                          {connectedFor === 'gdrive' ? (
-                            <p className="text-xs text-green-700 mt-1.5 font-medium">✓ Drive mappa létrehozva</p>
+                {/* ── 2. Google Drive ── */}
+                <StorageCard
+                  selected={choice === 'gdrive'}
+                  onClick={() => { setChoice('gdrive'); setError(null) }}
+                  icon={
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                      <path d="M4.5 19.5L8 13.5H20.5L17 19.5H4.5Z" fill="#34A853"/>
+                      <path d="M8 13.5L12 6H14L18 13.5H8Z" fill="#4285F4"/>
+                      <path d="M2 19.5L6 13.5L9 6H12L8 13.5L4.5 19.5H2Z" fill="#FBBC04"/>
+                    </svg>
+                  }
+                  iconBg="bg-white border border-border"
+                  title="Saját Google Drive"
+                  description="Az adataid a saját Google Drive-fiókodban tárolódnak — mi sosem férünk hozzá."
+                >
+                  <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <FeatureRow icon={<CheckCircle2 className="w-3 h-3 text-green-600" />} label="iPhone, Android, Mac, PC" />
+                    <FeatureRow icon={<CheckCircle2 className="w-3 h-3 text-green-600" />} label="Minden böngészőben" />
+                    <FeatureRow icon={<Globe className="w-3 h-3 text-blue-500" />} label="Mi nem látjuk az adatot" />
+                    <FeatureRow icon={<AlertTriangle className="w-3 h-3 text-amber-500" />} label="Megosztás nem elérhető" />
+                  </div>
+
+                  {choice === 'gdrive' && (
+                    <div className="mt-3">
+                      {connectedFor === 'gdrive' ? (
+                        <p className="text-xs font-medium text-green-700 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Drive mappa létrehozva
+                        </p>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleConnectGDrive}
+                          disabled={connecting}
+                          className="h-8 text-xs"
+                        >
+                          {connecting ? (
+                            <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> Csatlakozás…</>
                           ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="mt-2"
-                              onClick={handleConnectGDrive}
-                              disabled={connecting}
-                            >
-                              {connecting && subChoice !== 'fs_local' ? (
-                                <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Csatlakozás…</>
-                              ) : (
-                                'Bejelentkezés Google-be'
-                              )}
-                            </Button>
+                            'Bejelentkezés Google-fiókba →'
                           )}
-                        </div>
-                      </div>
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </StorageCard>
+
+                {/* ── 3. Lokális tárolás ── */}
+                {fsSupported && (
+                  <StorageCard
+                    selected={choice === 'fs_local'}
+                    onClick={() => { setChoice('fs_local'); setError(null) }}
+                    icon={<FolderOpen className="w-5 h-5 text-amber-700" />}
+                    iconBg={choice === 'fs_local' ? 'bg-amber-100' : 'bg-muted'}
+                    title="Lokális tárolás"
+                    description="Az adatok kizárólag a saját gépeden, egy általad választott mappában maradnak. Nincs internet, nincs cloud."
+                  >
+                    <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <FeatureRow icon={<CheckCircle2 className="w-3 h-3 text-green-600" />} label="Windows PC — Chrome, Edge" />
+                      <FeatureRow icon={<CheckCircle2 className="w-3 h-3 text-green-600" />} label="Mac — Chrome, Edge" />
+                      <FeatureRow icon={<Monitor className="w-3 h-3 text-muted-foreground" />} label="Csak asztali böngészőben" />
+                      <FeatureRow icon={<Smartphone className="w-3 h-3 text-red-400" />} label="iPhone, Android: nem működik" />
+                    </div>
+                    <div className="mt-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                      <strong>Kockázat:</strong> ha törlöd a mappát, más böngészőbe vált, vagy Safari-t használsz, az adataid elveszhetnek. Rendszeres exportálást ajánlunk.
                     </div>
 
-                    {/* File System Access — desktop only */}
-                    {fsSupported && (
-                      <div className={`rounded-lg border p-3 ${
-                        connectedFor === 'fs_local' ? 'border-green-500 bg-green-50' : 'border-border bg-background'
-                      }`}>
-                        <div className="flex items-start gap-3">
-                          <FolderOpen className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium">Saját mappa a gépemen</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Egy mappát választasz a saját gépeden — JSON fájlokba mentünk. Tényleg helyi, nincs cloud. <strong>Csak desktop böngészőben</strong>.
-                            </p>
-                            {connectedFor === 'fs_local' ? (
-                              <p className="text-xs text-green-700 mt-1.5 font-medium">✓ Mappa kiválasztva</p>
+                    {choice === 'fs_local' && (
+                      <div className="mt-3">
+                        {connectedFor === 'fs_local' ? (
+                          <p className="text-xs font-medium text-green-700 flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Mappa kiválasztva
+                          </p>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleConnectFs}
+                            disabled={connecting}
+                            className="h-8 text-xs"
+                          >
+                            {connecting ? (
+                              <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> Megnyitás…</>
                             ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="mt-2"
-                                onClick={handleConnectFs}
-                                disabled={connecting}
-                              >
-                                {connecting && subChoice !== 'gdrive' ? (
-                                  <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Megnyitás…</>
-                                ) : (
-                                  'Mappa kiválasztása'
-                                )}
-                              </Button>
+                              'Mappa kiválasztása →'
                             )}
-                          </div>
-                        </div>
+                          </Button>
+                        )}
                       </div>
                     )}
-
-                    {!fsSupported && (
-                      <p className="text-xs text-muted-foreground italic px-1">
-                        A "Saját mappa" opció csak desktop Chrome / Edge böngészőben elérhető.
-                      </p>
-                    )}
-                  </div>
+                  </StorageCard>
                 )}
 
                 {error && (
@@ -291,9 +266,9 @@ export function OnboardingPage() {
                   </div>
                 )}
 
-                {topChoice === 'own' && (
-                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-                    Az AI-segítséghez a beszélgetéseid áthaladnak a szerverünkön (de nem tároljuk őket — közvetlenül a választott helyedre kerülnek).
+                {(choice === 'gdrive' || choice === 'fs_local') && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-800">
+                    <strong>AI-feldolgozás:</strong> A beszélgetéseid szövege áthalad a szerverünkön (mert onnan hívjuk az AI modellt), de nem tároljuk — közvetlenül a választott helyedre íródik.
                   </div>
                 )}
               </div>
@@ -312,6 +287,69 @@ export function OnboardingPage() {
           </>
         )}
       </Card>
+    </div>
+  )
+}
+
+// ── Sub-components ─────────────────────────────────────────────────
+
+function StorageCard({
+  selected,
+  onClick,
+  icon,
+  iconBg,
+  badge,
+  badgeColor,
+  title,
+  description,
+  children,
+}: {
+  selected: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  iconBg: string
+  badge?: string
+  badgeColor?: string
+  title: string
+  description: string
+  children?: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
+        selected
+          ? 'border-primary bg-primary/5 shadow-sm'
+          : 'border-border bg-background hover:border-primary/40'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-sm">{title}</p>
+            {badge && (
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${badgeColor}`}>
+                {badge}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
+          {children}
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function FeatureRow({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {icon}
+      <span>{label}</span>
     </div>
   )
 }
