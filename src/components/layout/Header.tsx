@@ -31,6 +31,11 @@ export function Header({
   incomingShares = [], hasNewShares = false,
 }: HeaderProps) {
   const { profile, signOut } = useAuthStore()
+  const storagePref = profile?.storage_preference
+  const isCloud = storagePref === 'cloud'
+  const isGDrive = storagePref === 'gdrive'
+  const isFsLocal = storagePref === 'fs_local'
+  const isOwnDb = isGDrive || isFsLocal // "saját adatbázis" — disables sharing features
   const [sharesOpen, setSharesOpen] = useState(false)
   const sharesRef = useRef<HTMLDivElement>(null)
 
@@ -120,7 +125,7 @@ export function Header({
         </Tooltip>
 
         {/* "Mások élete" — dropdown for shared stories */}
-        {incomingShares.length > 0 && (
+        {!isOwnDb && incomingShares.length > 0 && (
           <div className="relative shrink-0" ref={sharesRef}>
             <Tooltip>
               <TooltipTrigger>
@@ -172,9 +177,15 @@ export function Header({
         {/* Invitations with badge */}
         <Tooltip>
           <TooltipTrigger>
-            <Button variant="ghost" size="icon" onClick={onShowInvitations} className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={isOwnDb ? undefined : onShowInvitations}
+              disabled={isOwnDb}
+              className={`relative ${isOwnDb ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
               <UserPlus className="w-4 h-4" />
-              {totalAlerts > 0 && (
+              {!isOwnDb && totalAlerts > 0 && (
                 <Badge
                   variant="destructive"
                   className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] flex items-center justify-center"
@@ -184,7 +195,7 @@ export function Header({
               )}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Meghívók & Megosztás</TooltipContent>
+          <TooltipContent>{isOwnDb ? 'Csak felhő módban érhető el' : 'Meghívók & Megosztás'}</TooltipContent>
         </Tooltip>
 
         {/* AI status */}
@@ -204,12 +215,26 @@ export function Header({
         <Tooltip>
           <TooltipTrigger>
             <div className="hidden sm:flex items-center gap-1.5 px-1 cursor-default">
-              <div className={`w-2 h-2 rounded-full ${statusColor(storageStatus)}`} />
-              <span className="text-xs text-muted-foreground">Tárolás</span>
+              <div className={`w-2 h-2 rounded-full ${
+                isGDrive ? 'bg-blue-500'
+                : isFsLocal ? 'bg-amber-700'
+                : statusColor(storageStatus)
+              }`} />
+              <span className="text-xs text-muted-foreground">{
+                isGDrive ? 'Drive'
+                : isFsLocal ? 'Helyi'
+                : 'Tárolás'
+              }</span>
             </div>
           </TooltipTrigger>
           <TooltipContent>
-            {storageStatus === 'ok' ? 'Szinkronban' : 'Szinkronizációs hiba'}
+            {isGDrive
+              ? 'Adatok a Google Drive-odon (Emlékkönyv mappa)'
+              : isFsLocal
+              ? 'Adatok egy saját mappában a gépeden'
+              : isCloud
+              ? (storageStatus === 'ok' ? 'Szinkronban (felhő)' : 'Szinkronizációs hiba')
+              : 'Tárolás'}
           </TooltipContent>
         </Tooltip>
 

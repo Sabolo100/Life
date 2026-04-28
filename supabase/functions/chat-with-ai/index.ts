@@ -22,6 +22,9 @@ interface ChatRequest {
   userId?: string
   messageCount?: number
   test?: boolean
+  existingEvents?: { id: string; title: string; category: string; narrative_text: string | null; is_turning_point: boolean; exact_date: string | null; estimated_year: number | null; life_phase: string | null }[]
+  existingLocationNames?: string[]
+  existingPersonNames?: string[]
 }
 
 const MODE_INSTRUCTIONS: Record<string, string> = {
@@ -415,9 +418,15 @@ Deno.serve(async (req) => {
     const chatMessages = request.messages.map(m => ({ role: m.role, content: m.content }))
     const userId = request.userId || ''
 
-    // Fetch existing data from DB for context
+    // Fetch existing data from DB for context, or accept it from the client (local-mode fallback)
     let existingData: ExistingData = { events: [], locationNames: [], personNames: [] }
-    if (userId) {
+    if (request.existingEvents !== undefined) {
+      existingData = {
+        events: request.existingEvents,
+        locationNames: request.existingLocationNames || [],
+        personNames: request.existingPersonNames || [],
+      }
+    } else if (userId) {
       existingData = await fetchExistingData(userId)
     }
 

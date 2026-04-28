@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth-store'
+import { isLocalStorageMode } from '@/lib/storage'
 import type {
   Invitation,
   LifeStoryShare,
@@ -83,6 +84,10 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Owner: Load invitations & shares ──────────────────────────────
 
   loadInvitations: async () => {
+    if (isLocalStorageMode()) {
+      // Invitations/shares are not available in local mode
+      return
+    }
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) return
@@ -124,6 +129,7 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Owner: Create invitation ──────────────────────────────────────
 
   createInvitation: async ({ invitedEmail, invitedName, permissionLevel, expiresAt }) => {
+    if (isLocalStorageMode()) return { data: null, error: 'Meghívók nem érhetők el lokális módban.' }
     try {
       // Read user directly from auth store — no network call, no hanging
       const user = useAuthStore.getState().user
@@ -177,6 +183,10 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Owner: Revoke invitation ──────────────────────────────────────
 
   revokeInvitation: async (id) => {
+    if (isLocalStorageMode()) {
+      // Invitations/shares are not available in local mode
+      return
+    }
     await supabase.from('invitations').delete().eq('id', id)
     set(state => ({
       invitations: state.invitations.filter(i => i.id !== id),
@@ -186,6 +196,10 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Owner: Revoke share ───────────────────────────────────────────
 
   revokeShare: async (id) => {
+    if (isLocalStorageMode()) {
+      // Invitations/shares are not available in local mode
+      return
+    }
     await supabase.from('life_story_shares').delete().eq('id', id)
     set(state => ({
       outgoingShares: state.outgoingShares.filter(s => s.id !== id),
@@ -195,6 +209,10 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Owner: Update share permission ────────────────────────────────
 
   updateSharePermission: async (id, level) => {
+    if (isLocalStorageMode()) {
+      // Invitations/shares are not available in local mode
+      return
+    }
     await supabase
       .from('life_story_shares')
       .update({ permission_level: level })
@@ -209,6 +227,10 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Owner: Load contributions ─────────────────────────────────────
 
   loadContributions: async () => {
+    if (isLocalStorageMode()) {
+      // Invitations/shares are not available in local mode
+      return
+    }
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) return
@@ -229,6 +251,10 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Owner: Review a contribution ──────────────────────────────────
 
   reviewContribution: async (id, decision, reviewerNotes) => {
+    if (isLocalStorageMode()) {
+      // Invitations/shares are not available in local mode
+      return
+    }
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) return
@@ -291,6 +317,10 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Guest: Load received invitations (where my email was invited) ──
 
   loadReceivedInvitations: async () => {
+    if (isLocalStorageMode()) {
+      // Invitations/shares are not available in local mode
+      return
+    }
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user?.email) return
@@ -323,6 +353,10 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Guest: Load incoming shares ───────────────────────────────────
 
   loadIncomingShares: async () => {
+    if (isLocalStorageMode()) {
+      // Invitations/shares are not available in local mode
+      return
+    }
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) return
@@ -354,6 +388,7 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Guest: Accept invitation (via Edge Function — bypasses RLS) ──
 
   acceptInvitation: async (token) => {
+    if (isLocalStorageMode()) return { success: false, error: 'Meghívó elfogadása nem lehetséges lokális módban.' }
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return { success: false, error: 'Nem vagy bejelentkezve.' }
 
@@ -395,6 +430,7 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
   // ── Guest: Auto-accept all pending invitations matching user email ──
 
   checkEmailInvitations: async () => {
+    if (isLocalStorageMode()) return []
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user?.email) return []
@@ -430,6 +466,10 @@ export const useInvitationStore = create<InvitationState>((set, get) => ({
     content,
     perspectiveType,
   }) => {
+    if (isLocalStorageMode()) {
+      // Invitations/shares are not available in local mode
+      return
+    }
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) return

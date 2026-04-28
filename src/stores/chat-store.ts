@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
-import { localDb, isLocalMode } from '@/lib/local-db'
+import { getAdapter } from '@/lib/storage'
 import type { ChatSession, Message, SessionMode, SessionGoal } from '@/types'
 
 interface ChatState {
@@ -29,8 +29,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadSessions: async () => {
     set({ loading: true })
 
-    if (isLocalMode()) {
-      const sessions = localDb.getAll<ChatSession>('chat_sessions')
+    const adapter = getAdapter()
+    if (adapter) {
+      const sessions = await adapter.getAll<ChatSession>('chat_sessions')
       sessions.sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
       set({ sessions, loading: false })
       return
@@ -44,17 +45,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   createSession: async (mode, goal) => {
-    if (isLocalMode()) {
+    const adapter = getAdapter()
+    if (adapter) {
       const session: ChatSession = {
-        id: localDb.genId(),
+        id: adapter.genId(),
         user_id: 'local',
         title: 'Új beszélgetés',
         mode,
         goal,
-        created_at: localDb.now(),
-        updated_at: localDb.now(),
+        created_at: adapter.now(),
+        updated_at: adapter.now(),
       } as ChatSession
-      localDb.upsert('chat_sessions', session)
+      await adapter.upsert('chat_sessions', session)
       set(state => ({ sessions: [session, ...state.sessions], currentSession: session, messages: [] }))
       return session
     }
@@ -88,9 +90,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   deleteSession: async (sessionId) => {
-    if (isLocalMode()) {
-      localDb.removeWhere('messages', m => m.session_id === sessionId)
-      localDb.remove('chat_sessions', sessionId)
+    const adapter = getAdapter()
+    if (adapter) {
+      await adapter.removeWhere('messages', m => m.session_id === sessionId)
+      await adapter.remove('chat_sessions', sessionId)
     } else {
       await supabase.from('messages').delete().eq('session_id', sessionId)
       await supabase.from('chat_sessions').delete().eq('id', sessionId)
@@ -106,8 +109,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const trimmed = title.trim()
     if (!trimmed) return
 
-    if (isLocalMode()) {
-      localDb.update<ChatSession>('chat_sessions', sessionId, { title: trimmed } as Partial<ChatSession>)
+    const adapter = getAdapter()
+    if (adapter) {
+      await adapter.update<ChatSession>('chat_sessions', sessionId, { title: trimmed } as Partial<ChatSession>)
     } else {
       await supabase
         .from('chat_sessions')
@@ -127,19 +131,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const session = get().currentSession
     if (!session) return null
 
-    if (isLocalMode()) {
+    const adapter = getAdapter()
+    if (adapter) {
       const message: Message = {
-        id: localDb.genId(),
+        id: adapter.genId(),
         session_id: session.id,
         user_id: 'local',
         content,
         is_user: isUser,
         draft: false,
-        created_at: localDb.now(),
+        created_at: adapter.now(),
       } as Message
-      localDb.upsert('messages', message)
+      await adapter.upsert('messages', message)
       set(state => ({ messages: [...state.messages, message] }))
-      localDb.update<ChatSession>('chat_sessions', session.id, { updated_at: localDb.now() } as Partial<ChatSession>)
+      await adapter.update<ChatSession>('chat_sessions', session.id, { updated_at: adapter.now() } as Partial<ChatSession>)
       return message
     }
 
@@ -169,8 +174,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   loadMessages: async (sessionId) => {
-    if (isLocalMode()) {
-      const allMessages = localDb.getAll<Message>('messages')
+    const adapter = getAdapter()
+    if (adapter) {
+      const allMessages = await adapter.getAll<Message>('messages')
       const sessionMessages = allMessages
         .filter(m => m.session_id === sessionId && !m.draft)
         .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''))

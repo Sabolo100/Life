@@ -1,4 +1,4 @@
-export type StoragePreference = 'cloud'
+export type StoragePreference = 'cloud' | 'gdrive' | 'fs_local'
 export type TimeType = 'exact_date' | 'estimated_year' | 'life_phase' | 'uncertain'
 export type Valence = 'positive' | 'negative' | 'mixed' | 'neutral'
 export type QuestionType = 'incomplete_topic' | 'unresolved_event' | 'unclear_time' | 'missing_detail' | 'follow_up'
@@ -11,6 +11,7 @@ export interface Profile {
   id: string
   display_name: string | null
   storage_preference: StoragePreference
+  drive_folder_id: string | null
   privacy_accepted_at: string | null
   onboarding_completed: boolean
   created_at: string

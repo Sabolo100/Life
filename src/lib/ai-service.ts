@@ -1,4 +1,6 @@
 import { supabase } from './supabase'
+import { isLocalStorageMode } from './storage'
+import { useLifeStoryStore } from '@/stores/life-story-store'
 
 interface ChatRequest {
   messages: { role: 'user' | 'assistant'; content: string }[]
@@ -39,8 +41,29 @@ export interface AITestResult {
 export async function sendChatMessage(request: ChatRequest): Promise<AIResponse> {
   console.log('[ai-service] Sending chat message, model:', request.aiModel)
 
+  // In user-owned-storage mode (Drive / FS) the Edge Function has no DB access to the user's data
+  // (it lives outside Supabase). Pass the local store contents so the Recorder/Interviewer get proper context.
+  let existingContext: Record<string, unknown> = {}
+  if (isLocalStorageMode()) {
+    const store = useLifeStoryStore.getState()
+    existingContext = {
+      existingEvents: store.events.map(e => ({
+        id: e.id,
+        title: e.title,
+        category: e.category,
+        narrative_text: e.narrative_text ?? null,
+        is_turning_point: e.is_turning_point ?? false,
+        exact_date: e.exact_date ?? null,
+        estimated_year: e.estimated_year ?? null,
+        life_phase: e.life_phase ?? null,
+      })),
+      existingLocationNames: store.locations.map(l => l.name),
+      existingPersonNames: store.persons.map(p => p.name),
+    }
+  }
+
   const { data, error } = await supabase.functions.invoke('chat-with-ai', {
-    body: request,
+    body: { ...request, ...existingContext },
   })
 
   if (error) {

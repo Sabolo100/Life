@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { HelpCircle, Eye } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth-store'
+import { isLocalStorageMode, initializeActiveAdapter } from '@/lib/storage'
 import type { LifeStoryShare } from '@/types'
 
 type View = 'chat' | 'lifeStory' | 'timeline' | 'map' | 'relationships' | 'settings' | 'invitations' | 'sharedStory'
@@ -48,7 +49,7 @@ export function MainPage() {
 
   // Show popup once per user when they have incoming shares they haven't seen
   useEffect(() => {
-    if (!user || incomingShares.length === 0) return
+    if (!user || incomingShares.length === 0 || isLocalStorageMode()) return
     const key = `seen_shares_${user.id}`
     const seenCount = parseInt(localStorage.getItem(key) || '0')
     if (incomingShares.length > seenCount) {
@@ -77,12 +78,19 @@ export function MainPage() {
   const pendingReceivedInvites = receivedInvitations.filter(i => i.status === 'pending').length
 
   useEffect(() => {
-    loadSessions()
-    loadAll()
-    loadInvitations()
-    loadIncomingShares()
-    loadContributions()
-    loadReceivedInvitations()
+    let cancelled = false
+    ;(async () => {
+      await initializeActiveAdapter()
+      if (cancelled) return
+      await Promise.all([loadSessions(), loadAll()])
+      if (!isLocalStorageMode()) {
+        loadInvitations()
+        loadIncomingShares()
+        loadContributions()
+        loadReceivedInvitations()
+      }
+    })()
+    return () => { cancelled = true }
   }, [loadSessions, loadAll, loadInvitations, loadIncomingShares, loadContributions, loadReceivedInvitations])
 
   useEffect(() => {

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
-import { localDb, isLocalMode } from '@/lib/local-db'
+import { getAdapter } from '@/lib/storage'
 import type { LifeStory, Person, LifeEvent, Location, TimePeriod, Emotion, OpenQuestion, FamilyRelationship, FamilyRelType } from '@/types'
 
 interface LifeStoryState {
@@ -129,16 +129,27 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   loadAll: async () => {
     set({ loading: true })
 
-    if (isLocalMode()) {
+    const adapter = getAdapter()
+    if (adapter) {
+      const [lifeStory, persons, events, locations, timePeriods, emotions, openQuestions, familyRelationships] = await Promise.all([
+        adapter.getLifeStory(),
+        adapter.getAll<Person>('persons'),
+        adapter.getAll<LifeEvent>('events'),
+        adapter.getAll<Location>('locations'),
+        adapter.getAll<TimePeriod>('time_periods'),
+        adapter.getAll<Emotion>('emotions'),
+        adapter.getAll<OpenQuestion>('open_questions'),
+        adapter.getAll<FamilyRelationship>('family_relationships'),
+      ])
       set({
-        lifeStory: localDb.getLifeStory() as LifeStory | null,
-        persons: localDb.getAll<Person>('persons'),
-        events: normalizeEvents(localDb.getAll<LifeEvent>('events')),
-        locations: localDb.getAll<Location>('locations'),
-        timePeriods: localDb.getAll<TimePeriod>('time_periods'),
-        emotions: localDb.getAll<Emotion>('emotions'),
-        openQuestions: localDb.getAll<OpenQuestion>('open_questions').filter(q => q.status === 'open'),
-        familyRelationships: localDb.getAll<FamilyRelationship>('family_relationships'),
+        lifeStory: (lifeStory as LifeStory | null),
+        persons,
+        events: normalizeEvents(events),
+        locations,
+        timePeriods,
+        emotions,
+        openQuestions: openQuestions.filter(q => q.status === 'open'),
+        familyRelationships,
         loading: false,
       })
       return
@@ -181,12 +192,13 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   updateLifeStory: async (content) => {
-    if (isLocalMode()) {
+    const adapter = getAdapter()
+    if (adapter) {
       const existing = get().lifeStory
       const story = existing
-        ? { ...existing, content, last_updated: localDb.now() }
-        : { id: localDb.genId(), content, title: 'Az én életutam', created_at: localDb.now(), last_updated: localDb.now() }
-      localDb.setLifeStory(story)
+        ? { ...existing, content, last_updated: adapter.now() }
+        : { id: adapter.genId(), content, title: 'Az én életutam', created_at: adapter.now(), last_updated: adapter.now() }
+      await adapter.setLifeStory(story as unknown as Record<string, unknown>)
       set({ lifeStory: story as LifeStory })
       return
     }
@@ -214,53 +226,58 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   upsertEntities: async (entities) => {
-    if (isLocalMode()) {
+    const adapter = getAdapter()
+    if (adapter) {
       const userId = 'local'
 
       if (entities.persons?.length) {
+        const existingPersons = await adapter.getAll<Person>('persons')
         for (const p of entities.persons) {
-          const existing = localDb.getAll<Person>('persons').find(ep => ep.name === p.name)
+          const existing = existingPersons.find(ep => ep.name === p.name)
           if (existing) {
-            localDb.update<Person>('persons', existing.id, { ...p } as Partial<Person>)
+            await adapter.update<Person>('persons', existing.id, { ...p } as Partial<Person>)
           } else {
-            localDb.upsert('persons', { ...p, id: localDb.genId(), user_id: userId, created_at: localDb.now() })
+            await adapter.upsert('persons', { ...p, id: adapter.genId(), user_id: userId, created_at: adapter.now() })
           }
         }
       }
       if (entities.events?.length) {
+        const existingEvents = await adapter.getAll<LifeEvent>('events')
         for (const e of entities.events) {
           const sanitized = sanitizeEventDates(e)
-          const existing = localDb.getAll<LifeEvent>('events').find(ee => ee.title === e.title)
+          const existing = existingEvents.find(ee => ee.title === e.title)
           if (existing) {
-            localDb.update<LifeEvent>('events', existing.id, { ...sanitized } as Partial<LifeEvent>)
+            await adapter.update<LifeEvent>('events', existing.id, { ...sanitized } as Partial<LifeEvent>)
           } else {
-            localDb.upsert('events', { ...sanitized, id: localDb.genId(), user_id: userId, created_at: localDb.now() })
+            await adapter.upsert('events', { ...sanitized, id: adapter.genId(), user_id: userId, created_at: adapter.now() })
           }
         }
       }
       if (entities.locations?.length) {
+        const existingLocations = await adapter.getAll<Location>('locations')
         for (const l of entities.locations) {
-          const existing = localDb.getAll<Location>('locations').find(el => el.name === l.name)
+          const existing = existingLocations.find(el => el.name === l.name)
           if (existing) {
-            localDb.update<Location>('locations', existing.id, { ...l } as Partial<Location>)
+            await adapter.update<Location>('locations', existing.id, { ...l } as Partial<Location>)
           } else {
-            localDb.upsert('locations', { ...l, id: localDb.genId(), user_id: userId })
+            await adapter.upsert('locations', { ...l, id: adapter.genId(), user_id: userId })
           }
         }
       }
       if (entities.timePeriods?.length) {
+        const existingPeriods = await adapter.getAll<TimePeriod>('time_periods')
         for (const t of entities.timePeriods) {
-          const existing = localDb.getAll<TimePeriod>('time_periods').find(et => et.label === (t as { label?: string }).label)
+          const existing = existingPeriods.find(et => et.label === (t as { label?: string }).label)
           if (existing) {
-            localDb.update<TimePeriod>('time_periods', existing.id, { ...t } as Partial<TimePeriod>)
+            await adapter.update<TimePeriod>('time_periods', existing.id, { ...t } as Partial<TimePeriod>)
           } else {
-            localDb.upsert('time_periods', { ...t, id: localDb.genId(), user_id: userId })
+            await adapter.upsert('time_periods', { ...t, id: adapter.genId(), user_id: userId })
           }
         }
       }
       if (entities.emotions?.length) {
         for (const em of entities.emotions) {
-          localDb.upsert('emotions', { ...em, id: localDb.genId(), user_id: userId })
+          await adapter.upsert('emotions', { ...em, id: adapter.genId(), user_id: userId })
         }
       }
 
@@ -316,8 +333,9 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
       const { lat, lon } = results[0]
       const coordinates = { lat: parseFloat(lat), lng: parseFloat(lon) }
 
-      if (isLocalMode()) {
-        localDb.update<Location>('locations', locationId, { coordinates, coordinates_confirmed: false } as Partial<Location>)
+      const adapter = getAdapter()
+      if (adapter) {
+        await adapter.update<Location>('locations', locationId, { coordinates, coordinates_confirmed: false } as Partial<Location>)
       } else {
         await supabase
           .from('locations')
@@ -336,8 +354,9 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   confirmLocation: async (locationId) => {
-    if (isLocalMode()) {
-      localDb.update<Location>('locations', locationId, { coordinates_confirmed: true } as Partial<Location>)
+    const adapter = getAdapter()
+    if (adapter) {
+      await adapter.update<Location>('locations', locationId, { coordinates_confirmed: true } as Partial<Location>)
     } else {
       await supabase
         .from('locations')
@@ -352,8 +371,9 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   updateLocationCoordinates: async (locationId, coordinates) => {
-    if (isLocalMode()) {
-      localDb.update<Location>('locations', locationId, { coordinates, coordinates_confirmed: false } as Partial<Location>)
+    const adapter = getAdapter()
+    if (adapter) {
+      await adapter.update<Location>('locations', locationId, { coordinates, coordinates_confirmed: false } as Partial<Location>)
     } else {
       await supabase
         .from('locations')
@@ -368,15 +388,17 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   updateOpenQuestions: async (questions) => {
-    if (isLocalMode()) {
+    const adapter = getAdapter()
+    if (adapter) {
       for (const q of questions) {
         if (q.id) {
-          localDb.update<OpenQuestion>('open_questions', q.id, q as Partial<OpenQuestion>)
+          await adapter.update<OpenQuestion>('open_questions', q.id, q as Partial<OpenQuestion>)
         } else {
-          localDb.upsert('open_questions', { ...q, id: localDb.genId(), user_id: 'local', status: 'open' })
+          await adapter.upsert('open_questions', { ...q, id: adapter.genId(), user_id: 'local', status: 'open' })
         }
       }
-      set({ openQuestions: localDb.getAll<OpenQuestion>('open_questions').filter(q => q.status === 'open') })
+      const all = await adapter.getAll<OpenQuestion>('open_questions')
+      set({ openQuestions: all.filter(q => q.status === 'open') })
       return
     }
 
@@ -401,16 +423,17 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   batchAddFamilyRelationships: async (entries) => {
     if (entries.length === 0) return
 
-    if (isLocalMode()) {
+    const adapter = getAdapter()
+    if (adapter) {
       const newRels: FamilyRelationship[] = entries.map(e => ({
-        id: localDb.genId(),
+        id: adapter.genId(),
         user_id: 'local',
         from_person_id: e.fromPersonId,
         to_person_id: e.toPersonId,
         relationship_type: e.type,
       } as unknown as FamilyRelationship))
       for (const r of newRels) {
-        localDb.upsert('family_relationships', r)
+        await adapter.upsert('family_relationships', r)
       }
       set(state => ({ familyRelationships: [...state.familyRelationships, ...newRels] }))
       return
@@ -432,15 +455,16 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   addFamilyRelationship: async (fromPersonId, toPersonId, type) => {
-    if (isLocalMode()) {
+    const adapter = getAdapter()
+    if (adapter) {
       const rel = {
-        id: localDb.genId(),
+        id: adapter.genId(),
         user_id: 'local',
         from_person_id: fromPersonId,
         to_person_id: toPersonId,
         relationship_type: type,
       } as unknown as FamilyRelationship
-      localDb.upsert('family_relationships', rel)
+      await adapter.upsert('family_relationships', rel)
       set(state => ({ familyRelationships: [...state.familyRelationships, rel] }))
       return
     }
@@ -466,11 +490,12 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   deleteLocation: async (id) => {
     const eventsToFix = get().events.filter(e => e.location_id === id)
 
-    if (isLocalMode()) {
+    const adapter = getAdapter()
+    if (adapter) {
       for (const ev of eventsToFix) {
-        localDb.update<LifeEvent>('events', ev.id, { location_id: null } as Partial<LifeEvent>)
+        await adapter.update<LifeEvent>('events', ev.id, { location_id: null } as Partial<LifeEvent>)
       }
-      localDb.remove('locations', id)
+      await adapter.remove('locations', id)
     } else {
       for (const ev of eventsToFix) {
         await supabase.from('events').update({ location_id: null }).eq('id', ev.id)
@@ -486,8 +511,9 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   updateEvent: async (id, updates) => {
-    if (isLocalMode()) {
-      localDb.update<LifeEvent>('events', id, updates as Partial<LifeEvent>)
+    const adapter = getAdapter()
+    if (adapter) {
+      await adapter.update<LifeEvent>('events', id, updates as Partial<LifeEvent>)
     } else {
       const { error } = await supabase.from('events').update(updates).eq('id', id)
       if (error) { console.error('[updateEvent] error:', error); throw error }
@@ -498,9 +524,10 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   deleteEvent: async (id) => {
-    if (isLocalMode()) {
-      localDb.removeWhere('emotions', i => i.event_id === id)
-      localDb.remove('events', id)
+    const adapter = getAdapter()
+    if (adapter) {
+      await adapter.removeWhere('emotions', i => i.event_id === id)
+      await adapter.remove('events', id)
     } else {
       await supabase.from('emotions').delete().eq('event_id', id)
       const { error } = await supabase.from('events').delete().eq('id', id)
@@ -513,12 +540,13 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   addPerson: async (person) => {
-    if (isLocalMode()) {
-      const newPerson = localDb.upsert('persons', {
+    const adapter = getAdapter()
+    if (adapter) {
+      const newPerson = await adapter.upsert('persons', {
         ...person,
-        id: localDb.genId(),
+        id: adapter.genId(),
         user_id: 'local',
-        created_at: localDb.now(),
+        created_at: adapter.now(),
       })
       set(state => ({ persons: [...state.persons, newPerson as Person] }))
       return
@@ -538,8 +566,9 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   updatePerson: async (id, updates) => {
-    if (isLocalMode()) {
-      localDb.update<Person>('persons', id, { ...updates, updated_at: localDb.now() } as Partial<Person>)
+    const adapter = getAdapter()
+    if (adapter) {
+      await adapter.update<Person>('persons', id, { ...updates, updated_at: adapter.now() } as Partial<Person>)
     } else {
       const { error } = await supabase
         .from('persons')
@@ -553,13 +582,14 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   deletePerson: async (id) => {
-    if (isLocalMode()) {
-      localDb.remove('persons', id)
-      localDb.removeWhere('family_relationships', r => r.from_person_id === id || r.to_person_id === id)
+    const adapter = getAdapter()
+    if (adapter) {
+      await adapter.remove('persons', id)
+      await adapter.removeWhere('family_relationships', r => r.from_person_id === id || r.to_person_id === id)
       const eventsToFix = get().events.filter(e => e.person_ids?.includes(id))
       for (const ev of eventsToFix) {
         const newIds = ev.person_ids.filter(pid => pid !== id)
-        localDb.update<LifeEvent>('events', ev.id, { person_ids: newIds } as Partial<LifeEvent>)
+        await adapter.update<LifeEvent>('events', ev.id, { person_ids: newIds } as Partial<LifeEvent>)
       }
     } else {
       const { error } = await supabase.from('persons').delete().eq('id', id)
@@ -585,8 +615,9 @@ export const useLifeStoryStore = create<LifeStoryState>((set, get) => ({
   },
 
   removeFamilyRelationship: async (id) => {
-    if (isLocalMode()) {
-      localDb.remove('family_relationships', id)
+    const adapter = getAdapter()
+    if (adapter) {
+      await adapter.remove('family_relationships', id)
     } else {
       await supabase.from('family_relationships').delete().eq('id', id)
     }

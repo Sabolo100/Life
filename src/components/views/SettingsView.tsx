@@ -5,7 +5,7 @@ import { testAIConnection, type AITestResult } from '@/lib/ai-service'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, CheckCircle2, XCircle, Zap } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Zap, FolderOpen, Cloud, HardDrive, Info } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface SettingsViewProps {
@@ -52,6 +52,55 @@ export function SettingsView({ onBack: _onBack }: SettingsViewProps) {
               </div>
             </div>
           </div>
+          {profile?.storage_preference === 'gdrive' ? (
+            <>
+              <div className="rounded-lg border border-blue-300 bg-blue-50 p-4">
+                <div className="flex items-start gap-3">
+                  <Cloud className="w-5 h-5 text-blue-700 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-blue-900">Adattárolás: Saját Google Drive</p>
+                    <p className="text-sm text-blue-800 mt-1">
+                      Az adataid a saját Drive-odon, az <strong>Emlékkönyv</strong> mappában vannak. Mi nem látjuk őket — csak te és a Google.
+                    </p>
+                    <p className="text-xs text-blue-700 mt-2">
+                      Megosztás és együttműködés ebben a módban nem elérhető.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <AiTransparencyCard />
+            </>
+          ) : profile?.storage_preference === 'fs_local' ? (
+            <>
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+                <div className="flex items-start gap-3">
+                  <FolderOpen className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-amber-900">Adattárolás: Saját mappa a gépeden</p>
+                    <p className="text-sm text-amber-800 mt-1">
+                      Az adataid egy mappában vannak a saját gépeden. Mi nem látjuk őket — csak te és az operációs rendszered.
+                    </p>
+                    <p className="text-xs text-amber-700 mt-2">
+                      Készíts másolatot a mappáról rendszeresen biztonsági mentés gyanánt. Megosztás és együttműködés ebben a módban nem elérhető.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <AiTransparencyCard />
+            </>
+          ) : (
+            <div className="rounded-lg border border-green-300 bg-green-50 p-4">
+              <div className="flex items-start gap-3">
+                <HardDrive className="w-5 h-5 text-green-700 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-green-900">Adattárolás: Felhő (szinkronizált)</p>
+                  <p className="text-sm text-green-800 mt-1">
+                    Az adataid biztonságosan a felhőben vannak, bármelyik eszközről elérheted.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           <Separator />
           <div>
             <h3 className="text-sm font-medium mb-3">AI beállítások</h3>
@@ -184,6 +233,27 @@ export function SettingsView({ onBack: _onBack }: SettingsViewProps) {
           </div>
         </div>
       </ScrollArea>
+    </div>
+  )
+}
+
+function AiTransparencyCard() {
+  return (
+    <div className="rounded-lg border border-border bg-muted/30 p-4">
+      <div className="flex items-start gap-3">
+        <Info className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+        <div className="space-y-2">
+          <p className="font-medium text-foreground">Hogyan kezeljük az adataidat?</p>
+          <p className="text-xs text-muted-foreground">
+            A naplóid, személyeid, helyszíneid és emlékeid <strong>kizárólag a kiválasztott helyen</strong> vannak tárolva.
+            Mi a szerverünkön nem őrzünk meg semmit ebből.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            <strong>AI segítség:</strong> amikor az AI-val beszélgetsz, a kérdés és a válasz <strong>áthalad</strong> a szerverünkön
+            (mert onnan hívjuk az AI-modellt), de <strong>nem tároljuk</strong> — közvetlenül a választott helyedre íródik.
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
