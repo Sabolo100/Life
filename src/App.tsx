@@ -7,6 +7,7 @@ import { OnboardingPage } from '@/pages/OnboardingPage'
 import { MainPage } from '@/pages/MainPage'
 import { PrivacyPage } from '@/pages/PrivacyPage'
 import { TermsPage } from '@/pages/TermsPage'
+import { DataDeletionPage } from '@/pages/DataDeletionPage'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
   const path = window.location.pathname
   if (path === '/privacy') return <PrivacyPage />
   if (path === '/terms') return <TermsPage />
+  if (path === '/data-deletion') return <DataDeletionPage />
 
   const { user, profile, loading, initialized, initialize } = useAuthStore()
   const { acceptInvitation, checkEmailInvitations } = useInvitationStore()
