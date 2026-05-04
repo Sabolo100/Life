@@ -30,7 +30,7 @@ import type { StorageAdapter, CollectionName } from './types'
 import { useAuthStore } from '@/stores/auth-store'
 import { supabase } from '@/lib/supabase'
 
-const FOLDER_NAME = 'Emlékkönyv'
+const FOLDER_NAME = 'Emlékkönyv (ne töröld!)'
 const FOLDER_MIME = 'application/vnd.google-apps.folder'
 const SCOPE = 'https://www.googleapis.com/auth/drive.file'
 const FILE_NAMES: Record<CollectionName | 'life_story', string> = {

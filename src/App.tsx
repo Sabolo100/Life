@@ -5,9 +5,16 @@ import { LandingPage } from '@/pages/LandingPage'
 import { AuthPage } from '@/pages/AuthPage'
 import { OnboardingPage } from '@/pages/OnboardingPage'
 import { MainPage } from '@/pages/MainPage'
+import { PrivacyPage } from '@/pages/PrivacyPage'
+import { TermsPage } from '@/pages/TermsPage'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
 export default function App() {
+  // Static pages — no auth needed
+  const path = window.location.pathname
+  if (path === '/privacy') return <PrivacyPage />
+  if (path === '/terms') return <TermsPage />
+
   const { user, profile, loading, initialized, initialize } = useAuthStore()
   const { acceptInvitation, checkEmailInvitations } = useInvitationStore()
   const [inviteToken, setInviteToken] = useState<string | null>(null)

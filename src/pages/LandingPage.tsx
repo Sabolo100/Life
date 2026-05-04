@@ -619,6 +619,15 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             <BookOpen className="w-5 h-5 text-amber-800" />
             <span className="font-serif font-bold text-lg text-amber-900">Emlékkönyv</span>
           </div>
+          <div className="flex items-center justify-center gap-4 mb-3">
+            <a href="/privacy" className="text-xs text-stone-400 hover:text-amber-800 transition-colors font-body">
+              Adatvédelmi irányelvek
+            </a>
+            <span className="text-stone-300">·</span>
+            <a href="/terms" className="text-xs text-stone-400 hover:text-amber-800 transition-colors font-body">
+              Felhasználási feltételek
+            </a>
+          </div>
           <p className="text-xs text-stone-400 font-body">
             © {new Date().getFullYear()} Emlékkönyv — www.emlekkonyv.com
           </p>
