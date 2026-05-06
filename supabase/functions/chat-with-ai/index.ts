@@ -11,6 +11,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Admin client for JWT verification — created once at module level
+const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
 interface ChatRequest {
   messages: { role: 'user' | 'assistant'; content: string }[]
   openQuestions: string[]
@@ -384,6 +387,21 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // === AUTH: verify JWT before processing any request ===
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const jwt = authHeader.replace('Bearer ', '')
+  if (!jwt) {
+    return new Response(JSON.stringify({ error: 'Nincs autorizáció.' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+  const { data: { user }, error: userErr } = await admin.auth.getUser(jwt)
+  if (userErr || !user) {
+    return new Response(JSON.stringify({ error: 'Érvénytelen session.' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
   try {
     const request: ChatRequest = await req.json()
     const model = request.aiModel || 'gpt-4.1-mini'
@@ -416,7 +434,7 @@ Deno.serve(async (req) => {
 
     // === NORMAL CHAT MODE: DUAL AGENT ===
     const chatMessages = request.messages.map(m => ({ role: m.role, content: m.content }))
-    const userId = request.userId || ''
+    const userId = user.id  // from verified JWT — never trust request.userId
 
     // Fetch existing data from DB for context, or accept it from the client (local-mode fallback)
     let existingData: ExistingData = { events: [], locationNames: [], personNames: [] }
@@ -529,7 +547,6 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         error: `Edge Function hiba: ${(error as Error).message}`,
-        stack: (error as Error).stack,
       }),
       {
         status: 500,

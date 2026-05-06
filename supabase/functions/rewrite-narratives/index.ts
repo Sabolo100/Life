@@ -16,17 +16,24 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // === AUTH: verify JWT before processing ===
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const jwt = authHeader.replace('Bearer ', '')
+  if (!jwt) {
+    return new Response(JSON.stringify({ error: 'Nincs autorizáció.' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  const { data: { user }, error: userErr } = await supabase.auth.getUser(jwt)
+  if (userErr || !user) {
+    return new Response(JSON.stringify({ error: 'Érvénytelen session.' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+  const userId = user.id  // from verified JWT — never trust request body
+
   try {
-    const { userId } = await req.json()
-    if (!userId) {
-      return new Response(JSON.stringify({ error: 'userId required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-
     // Fetch all events with narrative_text
     const { data: events, error } = await supabase
       .from('events')

@@ -65,11 +65,9 @@ interface InvitationState {
 
 function generateToken(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  let result = ''
-  for (let i = 0; i < 32; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return result
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, b => chars[b % chars.length]).join('')
 }
 
 export const useInvitationStore = create<InvitationState>((set, get) => ({
