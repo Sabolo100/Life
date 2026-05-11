@@ -44,10 +44,12 @@ export function Header({
   const [reportMessage, setReportMessage] = useState('')
   const [reportSending, setReportSending] = useState(false)
   const [reportSent, setReportSent] = useState(false)
+  const [reportError, setReportError] = useState<string | null>(null)
 
   const handleSendReport = async () => {
     if (!reportMessage.trim()) return
     setReportSending(true)
+    setReportError(null)
     try {
       const res = await fetch('/api/report-problem', {
         method: 'POST',
@@ -60,15 +62,22 @@ export function Header({
       })
       if (res.ok) {
         setReportSent(true)
-        setTimeout(() => {
-          setReportOpen(false)
-          setReportMessage('')
-          setReportSent(false)
-        }, 2500)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setReportError(data.error || 'Sikertelen küldés — próbáld újra.')
       }
+    } catch {
+      setReportError('Hálózati hiba — ellenőrizd az internetkapcsolatot.')
     } finally {
       setReportSending(false)
     }
+  }
+
+  const handleCloseReport = () => {
+    setReportOpen(false)
+    setReportMessage('')
+    setReportSent(false)
+    setReportError(null)
   }
 
   // Close dropdown when clicking outside
@@ -307,40 +316,46 @@ export function Header({
     {reportOpen && (
       <div className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-4">
         <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-md p-6">
-          <h2 className="font-semibold text-base mb-1">Probléma jelzése</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Írd le a problémát és értesítjük az adminisztrátort.
-          </p>
-          <textarea
-            className="w-full border rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary min-h-[120px] bg-background"
-            placeholder="Mi a probléma?"
-            value={reportMessage}
-            onChange={e => setReportMessage(e.target.value)}
-            disabled={reportSending || reportSent}
-            autoFocus
-          />
           {reportSent ? (
-            <p className="text-sm text-green-600 mt-3 text-center font-medium">
-              ✓ Köszönjük, megkaptuk a jelzést!
-            </p>
-          ) : (
-            <div className="flex gap-2 mt-3 justify-end">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setReportOpen(false); setReportMessage('') }}
-                disabled={reportSending}
-              >
-                Mégse
-              </Button>
-              <Button
-                size="sm"
-                disabled={!reportMessage.trim() || reportSending}
-                onClick={handleSendReport}
-              >
-                {reportSending ? 'Küldés…' : 'Küldés'}
-              </Button>
+            /* Success state */
+            <div className="text-center py-4">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-green-600 text-2xl">✓</span>
+              </div>
+              <h2 className="font-semibold text-base mb-1">Köszönjük!</h2>
+              <p className="text-sm text-muted-foreground mb-4">Az üzeneted megérkezett, hamarosan foglalkozunk vele.</p>
+              <Button size="sm" onClick={handleCloseReport}>Bezárás</Button>
             </div>
+          ) : (
+            <>
+              <h2 className="font-semibold text-base mb-1">Probléma jelzése</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Írd le a problémát és értesítjük az adminisztrátort.
+              </p>
+              <textarea
+                className="w-full border rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary min-h-[120px] bg-background"
+                placeholder="Mi a probléma?"
+                value={reportMessage}
+                onChange={e => setReportMessage(e.target.value)}
+                disabled={reportSending}
+                autoFocus
+              />
+              {reportError && (
+                <p className="text-sm text-red-600 mt-2">{reportError}</p>
+              )}
+              <div className="flex gap-2 mt-3 justify-end">
+                <Button variant="ghost" size="sm" onClick={handleCloseReport} disabled={reportSending}>
+                  Mégse
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!reportMessage.trim() || reportSending}
+                  onClick={handleSendReport}
+                >
+                  {reportSending ? 'Küldés…' : 'Küldés'}
+                </Button>
+              </div>
+            </>
           )}
         </div>
       </div>
