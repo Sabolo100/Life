@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthStore } from '@/stores/auth-store'
-import { BookOpen, Settings, LogOut, FileText, Clock, MapPin, Users, UserPlus, Eye, ChevronDown, MessageSquare, AlertCircle } from 'lucide-react'
+import { BookOpen, Settings, LogOut, FileText, Clock, MapPin, Users, UserPlus, Eye, ChevronDown, MessageSquare, AlertCircle, Flag } from 'lucide-react'
 import type { LifeStoryShare } from '@/types'
 
 interface HeaderProps {
@@ -30,7 +30,7 @@ export function Header({
   aiStatus, storageStatus, pendingContribCount = 0, pendingReceivedInvites = 0,
   incomingShares = [], hasNewShares = false,
 }: HeaderProps) {
-  const { profile, signOut } = useAuthStore()
+  const { user, profile, signOut } = useAuthStore()
   const storagePref = profile?.storage_preference
   const isCloud = storagePref === 'cloud'
   const isGDrive = storagePref === 'gdrive'
@@ -38,6 +38,38 @@ export function Header({
   const isOwnDb = isGDrive || isFsLocal // "saját adatbázis" — disables sharing features
   const [sharesOpen, setSharesOpen] = useState(false)
   const sharesRef = useRef<HTMLDivElement>(null)
+
+  // Report problem modal state
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportMessage, setReportMessage] = useState('')
+  const [reportSending, setReportSending] = useState(false)
+  const [reportSent, setReportSent] = useState(false)
+
+  const handleSendReport = async () => {
+    if (!reportMessage.trim()) return
+    setReportSending(true)
+    try {
+      const res = await fetch('/api/report-problem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: reportMessage,
+          userEmail: user?.email || '',
+          userName: profile?.display_name || '',
+        }),
+      })
+      if (res.ok) {
+        setReportSent(true)
+        setTimeout(() => {
+          setReportOpen(false)
+          setReportMessage('')
+          setReportSent(false)
+        }, 2500)
+      }
+    } finally {
+      setReportSending(false)
+    }
+  }
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -238,6 +270,16 @@ export function Header({
           </TooltipContent>
         </Tooltip>
 
+        {/* Report problem */}
+        <Tooltip>
+          <TooltipTrigger>
+            <Button variant="ghost" size="icon" onClick={() => setReportOpen(true)}>
+              <Flag className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Probléma jelzése</TooltipContent>
+        </Tooltip>
+
         {/* Settings */}
         <Tooltip>
           <TooltipTrigger>
@@ -259,5 +301,48 @@ export function Header({
         </Button>
       </div>
     </header>
+
+    {/* Report problem modal */}
+    {reportOpen && (
+      <div className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-4">
+        <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-md p-6">
+          <h2 className="font-semibold text-base mb-1">Probléma jelzése</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Írd le a problémát és értesítjük az adminisztrátort.
+          </p>
+          <textarea
+            className="w-full border rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary min-h-[120px] bg-background"
+            placeholder="Mi a probléma?"
+            value={reportMessage}
+            onChange={e => setReportMessage(e.target.value)}
+            disabled={reportSending || reportSent}
+            autoFocus
+          />
+          {reportSent ? (
+            <p className="text-sm text-green-600 mt-3 text-center font-medium">
+              ✓ Köszönjük, megkaptuk a jelzést!
+            </p>
+          ) : (
+            <div className="flex gap-2 mt-3 justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setReportOpen(false); setReportMessage('') }}
+                disabled={reportSending}
+              >
+                Mégse
+              </Button>
+              <Button
+                size="sm"
+                disabled={!reportMessage.trim() || reportSending}
+                onClick={handleSendReport}
+              >
+                {reportSending ? 'Küldés…' : 'Küldés'}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
   )
 }
