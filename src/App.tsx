@@ -9,6 +9,7 @@ import { PrivacyPage } from '@/pages/PrivacyPage'
 import { TermsPage } from '@/pages/TermsPage'
 import { DataDeletionPage } from '@/pages/DataDeletionPage'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { Analytics } from '@vercel/analytics/react'
 
 export default function App() {
   // Static pages — no auth needed
@@ -125,6 +126,8 @@ export default function App() {
   }
 
   return (
+    <>
+    <Analytics />
     <TooltipProvider>
       {/* Invite result notification */}
       {inviteResult && (
@@ -160,5 +163,6 @@ export default function App() {
         <MainPage />
       )}
     </TooltipProvider>
+    </>
   )
 }
