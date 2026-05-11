@@ -94,6 +94,7 @@ export function Header({
   const totalAlerts = pendingContribCount + pendingReceivedInvites
 
   return (
+    <>
     <header className="h-14 border-b border-amber-200/50 flex items-center px-3 gap-1 bg-[#f8f4ee]/90 backdrop-blur sticky top-0 z-50 shrink-0">
       {/* Logo — always visible, never scrolls away */}
       <button
@@ -344,5 +345,6 @@ export function Header({
         </div>
       </div>
     )}
+    </>
   )
 }
